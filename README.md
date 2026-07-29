@@ -47,7 +47,7 @@ All staked collateral is pooled into a single Master Escrow. When the market res
 
 ## ⚙️ How It Works (The Technical Sequence)
 
-### 1. Market Creation (`addQuestion`)
+### 1. Market Creation (`createMarket`)
 
 A user connects their wallet, defines a question, specifies the API endpoint for FDC resolution, and sets an `endTime`. The contract pulls the live FTSOv2 price, charges $13 in FLR, and opens the market.
 
@@ -136,23 +136,34 @@ cd VeilMarket
 forge soldeer install flare-periphery~0.1.50
 ```
 
-### 2. Environment Setup
+### 2. Private Key - Deployment without .env file having private key.
+
+1. Initiating
+
+```
+$ cast wallet import <keyName> --interactive
+```
+
+2. Put in Private key => copy and paste your Private key
+3. Give a Password => Give a new Password
+4. success message
+
+### 3. Environment Setup
 
 Create a `.env` file in the root directory:
 
 ```env
-PRIVATE_KEY=your_wallet_private_key_here
 COSTON2_RPC_URL=https://coston2-api.flare.network/ext/C/rpc
 ```
 
-### 3. Compile & Test
+### 4. Compile & Test
 
 ```bash
 forge build
 forge test
 ```
 
-### 4. Deploy to Coston2
+### 5. Deploy to Coston2
 
 ```bash
 forge script script/DeployVeilMarket.s.sol --rpc-url coston2 --broadcast
