@@ -5,7 +5,6 @@
 pragma solidity ^0.8.20;
 
 // imports
-import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
 
 interface IFtsoV2 {
     function getFeedById(
@@ -13,7 +12,7 @@ interface IFtsoV2 {
     ) external view returns (uint256 value, int8 decimals, uint64 timestamp);
 }
 
-contract VeilMarket is ReentrancyGuard {
+contract VeilMarket {
     // errors
     error NotOwner();
     error ZeroAddress();
@@ -37,7 +36,7 @@ contract VeilMarket is ReentrancyGuard {
     error NotImplemented();
     // interfaces, libraries, contracts
     // Type declarations
-    IFtsoV2 public ftsoV2;
+    IFtsoV2 public immutable i_ftsoV2;
     struct Market {
         address owner;
         string apiEndpoint;
@@ -60,9 +59,10 @@ contract VeilMarket is ReentrancyGuard {
     /// @notice After deadline + this window with no resolution, bettors may refund.
     uint256 public constant RESOLUTION_GRACE = 3 days;
 
-    bytes21 public flrUsdFeedId;
+    bytes21 public immutable i_flrUsdFeedId;
     address public owner;
     uint256 public marketCount;
+    uint256 private _locked = 1;
     mapping(uint256 marketId => Market) public markets;
     uint256 public accumulatedTreasuryFees;
     mapping(uint256 marketId => mapping(address bettor => uint256 stake))
@@ -86,10 +86,21 @@ contract VeilMarket is ReentrancyGuard {
         uint256 amount,
         bytes encryptedChoice
     );
+    event EmergencyRefunded(
+        uint256 indexed marketId,
+        address indexed bettor,
+        uint256 amount
+    );
     // Modifiers
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
         _;
+    }
+    modifier nonReentrant() {
+        if (_locked != 1) revert Reentrancy();
+        _locked = 2;
+        _;
+        _locked = 1;
     }
 
     // Functions
@@ -97,8 +108,9 @@ contract VeilMarket is ReentrancyGuard {
     // constructor
     constructor(address _ftsoV2Address, bytes21 _flrUsdFeedId) {
         if (_ftsoV2Address == address(0)) revert ZeroAddress();
-        ftsoV2 = IFtsoV2(_ftsoV2Address);
-        flrUsdFeedId = _flrUsdFeedId;
+        i_ftsoV2 = IFtsoV2(_ftsoV2Address);
+        i_flrUsdFeedId = _flrUsdFeedId;
+        emit OwnershipTransferred(address(0), owner);
         owner = msg.sender;
     }
 
@@ -121,10 +133,8 @@ contract VeilMarket is ReentrancyGuard {
         uint256 requiredFlrFee = getRequiredFee();
         if (msg.value < requiredFlrFee)
             revert InsufficientFee(requiredFlrFee, msg.value);
-
-        require(msg.value >= requiredFlrFee, "createMarket: Insufficient fee");
         //effect
-        marketId = marketCount++;
+        marketId = ++marketCount;
         accumulatedTreasuryFees += requiredFlrFee;
         Market storage m = markets[marketId];
         m.owner = msg.sender;
@@ -161,13 +171,33 @@ contract VeilMarket is ReentrancyGuard {
         emit BetPlaced(_marketId, msg.sender, msg.value, _encryptedChoice);
     }
 
+    function emergencyRefund(uint256 _marketId) external nonReentrant {
+        Market storage m = markets[_marketId];
+        if (m.owner == address(0)) revert MarketNotFound();
+        if (m.resolved) revert AlreadyResolved();
+        uint256 refundableAfter = m.deadline + RESOLUTION_GRACE;
+        if (block.timestamp < refundableAfter)
+            revert GracePeriodNotPassed(refundableAfter);
+
+        uint256 amount = stakeOf[_marketId][msg.sender];
+        if (amount == 0) revert NothingToWithdraw();
+
+        stakeOf[_marketId][msg.sender] = 0;
+        m.totalPool -= amount;
+
+        (bool ok, ) = payable(msg.sender).call{value: amount}("");
+        if (!ok) revert TransferFailed();
+
+        emit EmergencyRefunded(_marketId, msg.sender, amount);
+    }
+
     // public
     // internal
     // private
     // view & pure functions
     function getRequiredFee() public view returns (uint256) {
-        (uint256 flrPrice, int8 decimals, uint64 ts) = ftsoV2.getFeedById(
-            flrUsdFeedId
+        (uint256 flrPrice, int8 decimals, uint64 ts) = i_ftsoV2.getFeedById(
+            i_flrUsdFeedId
         );
         if (flrPrice == 0) revert InvalidOraclePrice();
         if (decimals < 0) revert NegativeDecimals();
@@ -187,6 +217,7 @@ contract VeilMarket is ReentrancyGuard {
     function transferOwnership(address newOwner) external onlyOwner {
         if (newOwner == address(0)) revert ZeroAddress();
         owner = newOwner;
+        emit OwnershipTransferred(owner, newOwner);
     }
 
     function withdrawTreasury(address to) external onlyOwner nonReentrant {
