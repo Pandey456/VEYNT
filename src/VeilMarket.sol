@@ -5,14 +5,36 @@
 pragma solidity ^0.8.20;
 
 // imports
+import {ReentrancyGuard} from "../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+
 interface IFtsoV2 {
     function getFeedById(
         bytes21 _feedId
     ) external view returns (uint256 value, int8 decimals, uint64 timestamp);
 }
 
-contract VeilMarket {
+contract VeilMarket is ReentrancyGuard {
     // errors
+    error NotOwner();
+    error ZeroAddress();
+    error DeadlineInPast();
+    error DurationTooShort(uint256 earliestAllowedDeadline);
+    error EmptyQuestion();
+    error EmptyEndpoint();
+    error InvalidOraclePrice();
+    error NegativeDecimals();
+    error StalePrice(uint256 age);
+    error InsufficientFee(uint256 required, uint256 sent);
+    error RefundFailed();
+    error MarketNotFound();
+    error MarketClosed();
+    error ZeroStake();
+    error AlreadyResolved();
+    error GracePeriodNotPassed(uint256 refundableAfter);
+    error NothingToWithdraw();
+    error TransferFailed();
+    error Reentrancy();
+    error NotImplemented();
     // interfaces, libraries, contracts
     // Type declarations
     IFtsoV2 public ftsoV2;
@@ -28,11 +50,23 @@ contract VeilMarket {
     }
 
     // State variables
-    uint256 constant TARGET_USD_FEE = 13 ether; // 13 * 10^18 wei;
+    //CONSTANTS
+    /// @notice Target creation fee, expressed in USD with 18 decimals ($13).
+    uint256 public constant TARGET_USD_FEE = 13 ether;
+    /// @notice Minimum time a market must stay open.
+    uint256 public constant MIN_MARKET_DURATION = 5 minutes;
+    /// @notice Reject the oracle price if older than this.
+    uint256 public constant MAX_PRICE_AGE = 1 hours;
+    /// @notice After deadline + this window with no resolution, bettors may refund.
+    uint256 public constant RESOLUTION_GRACE = 3 days;
+
     bytes21 public flrUsdFeedId;
+    address public owner;
     uint256 public marketCount;
     mapping(uint256 marketId => Market) public markets;
     uint256 public accumulatedTreasuryFees;
+    mapping(uint256 marketId => mapping(address bettor => uint256 stake))
+        public stakeOf;
 
     // Events
     event MarketCreated(
@@ -42,14 +76,30 @@ contract VeilMarket {
         string apiEndpoint,
         uint256 deadline
     );
-
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
+    event BetPlaced(
+        uint256 indexed marketId,
+        address indexed bettor,
+        uint256 amount,
+        bytes encryptedChoice
+    );
     // Modifiers
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert NotOwner();
+        _;
+    }
+
     // Functions
     // Layout of Functions:
     // constructor
     constructor(address _ftsoV2Address, bytes21 _flrUsdFeedId) {
+        if (_ftsoV2Address == address(0)) revert ZeroAddress();
         ftsoV2 = IFtsoV2(_ftsoV2Address);
         flrUsdFeedId = _flrUsdFeedId;
+        owner = msg.sender;
     }
 
     // receive function (if exists)
@@ -57,52 +107,95 @@ contract VeilMarket {
     // external
 
     function createMarket(
-        string memory _question,
+        string calldata _question,
         uint256 _deadline,
-        string memory _apiEndpoint
-    ) external payable {
+        string calldata _apiEndpoint
+    ) external payable nonReentrant returns (uint256 marketId) {
         //checks
-        require(
-            _deadline > block.timestamp,
-            "createMarket: Deadline should be in future"
-        );
-        (uint256 flrPrice, int8 decimals, ) = ftsoV2.getFeedById(flrUsdFeedId);
-        require(flrPrice > 0, "createMarket: Invalid oracle price");
-        uint256 multiplier = 10 ** uint256(int256(decimals));
-        uint256 requiredFlrFee = (TARGET_USD_FEE * multiplier) / flrPrice;
+        if (_deadline <= block.timestamp) revert DeadlineInPast();
+        uint256 earliest = block.timestamp + MIN_MARKET_DURATION;
+        if (_deadline < earliest) revert DurationTooShort(earliest);
+        if (bytes(_question).length == 0) revert EmptyQuestion();
+        if (bytes(_apiEndpoint).length == 0) revert EmptyEndpoint();
+
+        uint256 requiredFlrFee = getRequiredFee();
+        if (msg.value < requiredFlrFee)
+            revert InsufficientFee(requiredFlrFee, msg.value);
+
         require(msg.value >= requiredFlrFee, "createMarket: Insufficient fee");
         //effect
-        marketCount++;
+        marketId = marketCount++;
         accumulatedTreasuryFees += requiredFlrFee;
-        markets[marketCount] = Market({
-            owner: msg.sender,
-            question: _question,
-            apiEndpoint: _apiEndpoint,
-            deadline: _deadline,
-            totalPool: 0,
-            resolved: false,
-            outcome: false,
-            merkleRoot: 0
-        });
-        uint256 excess;
-
+        Market storage m = markets[marketId];
+        m.owner = msg.sender;
+        m.question = _question;
+        m.apiEndpoint = _apiEndpoint;
+        m.deadline = _deadline;
         emit MarketCreated(
-            marketCount,
+            marketId,
             msg.sender,
             _question,
             _apiEndpoint,
             _deadline
         );
         // interactions
-        if (msg.value > requiredFlrFee) {
-            excess = msg.value - requiredFlrFee;
-            (bool success, ) = payable(msg.sender).call{value: excess}("");
-            require(success, "createMarket: Refund failed");
+        uint256 excess = msg.value - requiredFlrFee;
+        if (excess > 0) {
+            (bool ok, ) = payable(msg.sender).call{value: excess}("");
+            if (!ok) revert RefundFailed();
         }
+    }
+
+    function predict(
+        uint256 _marketId,
+        bytes calldata _encryptedChoice
+    ) external payable nonReentrant {
+        Market storage m = markets[_marketId];
+        if (m.owner == address(0)) revert MarketNotFound();
+        if (block.timestamp >= m.deadline) revert MarketClosed();
+        if (msg.value == 0) revert ZeroStake();
+
+        stakeOf[_marketId][msg.sender] += msg.value;
+        m.totalPool += msg.value;
+
+        emit BetPlaced(_marketId, msg.sender, msg.value, _encryptedChoice);
     }
 
     // public
     // internal
     // private
     // view & pure functions
+    function getRequiredFee() public view returns (uint256) {
+        (uint256 flrPrice, int8 decimals, uint64 ts) = ftsoV2.getFeedById(
+            flrUsdFeedId
+        );
+        if (flrPrice == 0) revert InvalidOraclePrice();
+        if (decimals < 0) revert NegativeDecimals();
+
+        // Staleness guard (skip if the feed reports a future/equal timestamp).
+        if (ts < block.timestamp) {
+            uint256 age = block.timestamp - ts;
+            if (age > MAX_PRICE_AGE) revert StalePrice(age);
+        }
+
+        // price = flrPrice / 10^decimals  ->  requiredWei = 13e18 * 10^decimals / flrPrice
+        uint256 multiplier = 10 ** uint256(uint8(decimals)); // safe: decimals >= 0
+        return (TARGET_USD_FEE * multiplier) / flrPrice;
+    }
+
+    //ADMIN
+    function transferOwnership(address newOwner) external onlyOwner {
+        if (newOwner == address(0)) revert ZeroAddress();
+        owner = newOwner;
+    }
+
+    function withdrawTreasury(address to) external onlyOwner nonReentrant {
+        if (to == address(0)) revert ZeroAddress();
+        uint256 amount = accumulatedTreasuryFees;
+        if (amount == 0) revert NothingToWithdraw();
+
+        accumulatedTreasuryFees = 0;
+        (bool ok, ) = payable(to).call{value: amount}("");
+        if (!ok) revert TransferFailed();
+    }
 }
