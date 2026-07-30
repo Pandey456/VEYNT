@@ -1,0 +1,43 @@
+# name: TEE Market Resolution Engine
+
+# on:
+#   # Allows manual triggers via GitHub UI (Great for Live Demos!)
+#   workflow_dispatch:
+#     inputs:
+#       marketId:
+#         description: "Market ID to resolve"
+#         required: true
+#         default: "0"
+#       outcome:
+#         description: "Winning Outcome (YES/NO)"
+#         required: true
+#         default: "YES"
+
+#   # Runs automatically every 15 minutes
+#   schedule:
+#     - cron: "*/15 * * * *"
+
+# jobs:
+#   run-tee-engine:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout Code
+#         uses: actions/checkout@v3
+
+#       - name: Setup Node.js
+#         uses: actions/setup-node@v3
+#         with:
+#           node-version: "18"
+
+#       - name: Install Dependencies
+#         run: npm install
+
+#       - name: Execute TEE Resolution Engine
+#         run: node teeEngine.js
+#         env:
+#           FLARE_RPC_URL: ${{ secrets.FLARE_RPC_URL }}
+#           TEE_PRIVATE_KEY: ${{ secrets.TEE_PRIVATE_KEY }}
+#           VEIL_MARKET_ADDRESS: ${{ secrets.VEIL_MARKET_ADDRESS }}
+#           MARKET_ID: ${{ github.event.inputs.marketId || '0' }}
+#           OUTCOME: ${{ github.event.inputs.outcome || 'YES' }}
