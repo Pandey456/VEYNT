@@ -80,7 +80,7 @@ contract VeilMarket {
         address indexed previousOwner,
         address indexed newOwner
     );
-    event BetPlaced(
+    event PredictionPlaced(
         uint256 indexed marketId,
         address indexed bettor,
         uint256 amount,
@@ -168,7 +168,12 @@ contract VeilMarket {
         stakeOf[_marketId][msg.sender] += msg.value;
         m.totalPool += msg.value;
 
-        emit BetPlaced(_marketId, msg.sender, msg.value, _encryptedChoice);
+        emit PredictionPlaced(
+            _marketId,
+            msg.sender,
+            msg.value,
+            _encryptedChoice
+        );
     }
 
     function emergencyRefund(uint256 _marketId) external nonReentrant {
