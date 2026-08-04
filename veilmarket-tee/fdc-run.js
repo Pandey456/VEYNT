@@ -26,7 +26,7 @@ async function prepareRequest() {
   //     abiSignature: "bool",
   //   },
   // };
-  const requestBody = {
+  const body = {
     url: "https://api.coinbase.com/v2/prices/BTC-USD/spot",
     httpMethod: "GET",
     headers: "{}",
