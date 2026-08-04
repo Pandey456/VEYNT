@@ -37,10 +37,10 @@ async function prepareRequest() {
       queryParams: "{}",
       body: "{}",
       postProcessJq:
-        '{ price: ((.data.amount | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
+        '{ "price": ((.data.amount | tonumber) * 100000000 | floor) }',
       abiSignature: JSON.stringify({
         type: "tuple",
-        name: "priceData",
+        name: "PriceData",
         components: [
           {
             internalType: "uint256",
