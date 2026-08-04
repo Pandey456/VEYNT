@@ -5,6 +5,7 @@
 pragma solidity ^0.8.20;
 
 // imports
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 interface IFtsoV2 {
     function getFeedById(
@@ -60,6 +61,9 @@ contract VeilMarket {
     uint256 public constant RESOLUTION_GRACE = 3 days;
 
     bytes21 public immutable i_flrUsdFeedId;
+    address public immutable i_teeSigner;
+    mapping(uint256 marketId => mapping(address bettor => bool claimed))
+        public hasClaimed;
     address public owner;
     uint256 public marketCount;
     uint256 private _locked = 1;
@@ -106,12 +110,18 @@ contract VeilMarket {
     // Functions
     // Layout of Functions:
     // constructor
-    constructor(address _ftsoV2Address, bytes21 _flrUsdFeedId) {
-        if (_ftsoV2Address == address(0)) revert ZeroAddress();
+    constructor(
+        address _ftsoV2Address,
+        bytes21 _flrUsdFeedId,
+        address _teeSigner
+    ) {
+        if (_ftsoV2Address == address(0) || _teeSigner == address(0))
+            revert ZeroAddress();
         i_ftsoV2 = IFtsoV2(_ftsoV2Address);
         i_flrUsdFeedId = _flrUsdFeedId;
-        emit OwnershipTransferred(address(0), owner);
+        i_teeSigner = _teeSigner;
         owner = msg.sender;
+        emit OwnershipTransferred(address(0), owner);
     }
 
     // receive function (if exists)
@@ -196,8 +206,78 @@ contract VeilMarket {
         emit EmergencyRefunded(_marketId, msg.sender, amount);
     }
 
+    function resolveMarket(
+        uint256 _marketId,
+        bytes32 _merkleRoot,
+        string calldata _outcome,
+        bytes calldata _signature
+    ) external nonReentrant {
+        Market storage m = markets[_marketId];
+        if (m.owner == address(0)) revert MarketNotFound();
+        if (m.resolved) revert AlreadyResolved();
+
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(_marketId, _merkleRoot, _outcome)
+        );
+        bytes32 ethSignedMessageHash = keccak256(
+            abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
+        );
+
+        address recoveredSigner = recoverSigner(
+            ethSignedMessageHash,
+            _signature
+        );
+        require(recoveredSigner == i_teeSigner, "Invalid TEE signature");
+
+        m.resolved = true;
+        m.merkleRoot = _merkleRoot;
+    }
+
+    function claimPayout(
+        uint256 _marketId,
+        uint256 _payout,
+        bytes32[] calldata _merkleProof
+    ) external nonReentrant {
+        Market storage m = markets[_marketId];
+        if (!m.resolved) revert NotImplemented(); // Or custom error MarketNotResolved
+        if (hasClaimed[_marketId][msg.sender]) revert NothingToWithdraw();
+
+        // Verify leaf node matches caller address and calculated payout
+        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, _payout));
+        require(
+            MerkleProof.verify(_merkleProof, m.merkleRoot, leaf),
+            "Invalid Merkle proof"
+        );
+
+        hasClaimed[_marketId][msg.sender] = true;
+
+        (bool ok, ) = payable(msg.sender).call{value: _payout}("");
+        if (!ok) revert TransferFailed();
+    }
+
     // public
     // internal
+
+    function recoverSigner(
+        bytes32 _ethSignedMessageHash,
+        bytes memory _sig
+    ) internal pure returns (address) {
+        require(_sig.length == 65, "invalid signature length");
+
+        bytes32 r;
+        bytes32 s;
+        uint8 v;
+
+        // Standard memory/calldata slicing to extract r, s, v safely
+        assembly {
+            r := mload(add(_sig, 32))
+            s := mload(add(_sig, 64))
+            v := byte(0, mload(add(_sig, 96)))
+        }
+
+        return ecrecover(_ethSignedMessageHash, v, r, s);
+    }
+
     // private
     // view & pure functions
     function getRequiredFee() public view returns (uint256) {
