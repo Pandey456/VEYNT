@@ -64,6 +64,7 @@ async function prepareRequest() {
   }
 
   console.log("Step 1 OK — abiEncodedRequest ready");
+  console.log("abiEncodedRequest:", data.abiEncodedRequest);
   return data.abiEncodedRequest;
 }
 
