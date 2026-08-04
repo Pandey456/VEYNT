@@ -26,18 +26,35 @@ async function prepareRequest() {
   //     abiSignature: "bool",
   //   },
   // };
+  // const body = {
+  //   url: "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+  //   httpMethod: "GET",
+  //   headers: "{}",
+  //   queryParams: "{}",
+  //   body: "{}",
+  //   postProcessJq:
+  //     '{ price: ((.data.amount | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
+  //   abiSignature: JSON.stringify({
+  //     type: "tuple",
+  //     components: [{ name: "price", type: "uint256" }],
+  //   }),
+  // };
   const body = {
-    url: "https://api.coinbase.com/v2/prices/BTC-USD/spot",
-    httpMethod: "GET",
-    headers: "{}",
-    queryParams: "{}",
-    body: "{}",
-    postProcessJq:
-      '{ price: ((.data.amount | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
-    abiSignature: JSON.stringify({
-      type: "tuple",
-      components: [{ name: "price", type: "uint256" }],
-    }),
+    attestationType: toBytes32("Web2Json"),
+    sourceId: toBytes32("PublicWeb2"),
+    requestBody: {
+      url: "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+      httpMethod: "GET",
+      headers: "{}",
+      queryParams: "{}",
+      body: "{}",
+      postProcessJq:
+        '{ price: ((.data.amount | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
+      abiSignature: JSON.stringify({
+        type: "tuple",
+        components: [{ name: "price", type: "uint256" }],
+      }),
+    },
   };
 
   const res = await fetch(VERIFIER_URL, {
