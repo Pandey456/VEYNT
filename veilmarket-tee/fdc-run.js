@@ -27,29 +27,29 @@ async function prepareRequest() {
   //   },
   // };
 
+  const requestBody = {
+    url: "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+    httpMethod: "GET",
+    headers: "{}",
+    queryParams: "{}",
+    body: "{}",
+    postProcessJq:
+      '{ price: ((.data.amount | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
+    abiSignature: JSON.stringify({
+      type: "tuple",
+      components: [
+        {
+          name: "price",
+          type: "uint256",
+        },
+      ],
+    }),
+  };
+
   const body = {
     attestationType: toBytes32("Web2Json"),
     sourceId: toBytes32("PublicWeb2"),
-    requestBody: {
-      url: "https://api.coinbase.com/v2/prices/BTC-USD/spot",
-      httpMethod: "GET",
-      headers: "{}",
-      queryParams: "{}",
-      body: "{}",
-      postProcessJq:
-        '{ "price": ((.data.amount | tonumber) * 100000000 | floor) }',
-      abiSignature: JSON.stringify({
-        type: "tuple",
-        name: "PriceData",
-        components: [
-          {
-            internalType: "uint256",
-            name: "price",
-            type: "uint256",
-          },
-        ],
-      }),
-    },
+    requestBody,
   };
 
   const res = await fetch(VERIFIER_URL, {
