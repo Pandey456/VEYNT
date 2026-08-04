@@ -27,14 +27,33 @@ async function prepareRequest() {
   //   },
   // };
 
+  // const requestBody = {
+  //   url: "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+  //   httpMethod: "GET",
+  //   headers: "{}",
+  //   queryParams: "{}",
+  //   body: "{}",
+  //   postProcessJq:
+  //     '{ price: ((.data.amount | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
+  //   abiSignature: JSON.stringify({
+  //     type: "tuple",
+  //     components: [
+  //       {
+  //         name: "price",
+  //         type: "uint256",
+  //       },
+  //     ],
+  //   }),
+  // };
   const requestBody = {
-    url: "https://api.coinbase.com/v2/prices/BTC-USD/spot",
+    url: "https://data-api.binance.vision/api/v3/ticker/price",
     httpMethod: "GET",
     headers: "{}",
-    queryParams: "{}",
+    queryParams: JSON.stringify({
+      symbol: "BTCUSDT",
+    }),
     body: "{}",
-    postProcessJq:
-      '{ price: ((.data.amount | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
+    postProcessJq: '{ price: (.price | gsub("[.]"; "") | tonumber) }',
     abiSignature: JSON.stringify({
       type: "tuple",
       components: [
