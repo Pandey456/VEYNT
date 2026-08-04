@@ -123,3 +123,15 @@ async function getProof(roundId, abiEncodedRequest) {
   console.log("Step 4 OK — proof received");
   return data;
 }
+async function main() {
+  const abiEncodedRequest = await prepareRequest();       // Step 1
+  const roundId = await submitRequest(abiEncodedRequest); // Step 2
+  await waitForFinalization(180);                         // Step 3
+  const proof = await getProof(roundId, abiEncodedRequest); // Step 4
+  console.log("ALL DONE — full proof:", JSON.stringify(proof, null, 2));
+}
+
+main().catch((e) => {
+  console.error("FAILED:", e.message);
+  process.exit(1);
+});
