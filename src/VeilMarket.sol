@@ -52,7 +52,8 @@ contract VeilMarket {
     // State variables
     //CONSTANTS
     /// @notice Target creation fee, expressed in USD with 18 decimals ($13).
-    uint256 public constant TARGET_USD_FEE = 13 ether;
+    // uint256 public constant TARGET_USD_FEE = 13 ether;
+    uint256 public constant TARGET_USD_FEE = 5e17;
     /// @notice Minimum time a market must stay open.
     uint256 public constant MIN_MARKET_DURATION = 5 minutes;
     /// @notice Reject the oracle price if older than this.

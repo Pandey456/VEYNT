@@ -19,6 +19,8 @@ if (!MARKET_ID)
 
 const RPC_URL = "https://coston2-api.flare.network/ext/C/rpc";
 const VEIL_MARKET_ADDRESS = process.env.VEIL_MARKET_ADDRESS;
+console.log("Length:", process.env.PRIVATE_KEY?.length);
+console.log("Starts with 0x:", process.env.PRIVATE_KEY?.startsWith("0x"));
 
 const deployerAccount = privateKeyToAccount(process.env.PRIVATE_KEY);
 const teeAccount = privateKeyToAccount(process.env.TEE_PRIVATE_KEY);
@@ -78,6 +80,7 @@ async function runProductionEvaluator() {
   if (market.owner === "0x0000000000000000000000000000000000000000")
     throw new Error("Market does not exist.");
   if (market.resolved) throw new Error("Market already resolved.");
+  console.log(market);
 
   // Parse target from question: e.g. "BTC|ABOVE|6500000000000"
   const parts = market.question.split("|");

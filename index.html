@@ -88,29 +88,453 @@
       <button id="finalizeBtn">Trigger TEE Finalize Workflow</button>
       <p id="finalizeStatus"></p>
     </div>
-
     <script type="module">
-      import { ethers } from "https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.min.js";
+      import {
+        createWalletClient,
+        custom,
+        getContract,
+        parseEther,
+        stringToHex,
+        publicActions,
+        defineChain,
+      } from "https://esm.sh/viem@2.55.11";
 
-      const CONTRACT_ADDRESS = "0x12b4efc2ed4dd375c2695d98b5f6dcf6ab2b320d";
+      const coston2 = defineChain({
+        id: 114,
+        name: "Flare Coston2",
+        nativeCurrency: {
+          name: "Coston2 FLR",
+          symbol: "C2FLR",
+          decimals: 18,
+        },
+        rpcUrls: {
+          default: {
+            http: ["https://coston2-api.flare.network/ext/C/rpc"],
+          },
+        },
+      });
+
+      const CONTRACT_ADDRESS = "0x3A5CCd3f6BfA8626dCd7454EaA1009B82E10e0fD";
 
       const ABI = [
-        "function getRequiredFee() view returns (uint256)",
-        "function createMarket(string _question, uint256 _deadline, string _apiEndpoint) payable returns (uint256)",
-        "function predict(uint256 _marketId, bytes _encryptedChoice) payable",
+        {
+          type: "constructor",
+          inputs: [
+            {
+              name: "_ftsoV2Address",
+              type: "address",
+              internalType: "address",
+            },
+            { name: "_flrUsdFeedId", type: "bytes21", internalType: "bytes21" },
+            { name: "_teeSigner", type: "address", internalType: "address" },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "MAX_PRICE_AGE",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "MIN_MARKET_DURATION",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "RESOLUTION_GRACE",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "TARGET_USD_FEE",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "accumulatedTreasuryFees",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "claimPayout",
+          inputs: [
+            { name: "_marketId", type: "uint256", internalType: "uint256" },
+            { name: "_payout", type: "uint256", internalType: "uint256" },
+            {
+              name: "_merkleProof",
+              type: "bytes32[]",
+              internalType: "bytes32[]",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "createMarket",
+          inputs: [
+            { name: "_question", type: "string", internalType: "string" },
+            { name: "_deadline", type: "uint256", internalType: "uint256" },
+            { name: "_apiEndpoint", type: "string", internalType: "string" },
+          ],
+          outputs: [
+            { name: "marketId", type: "uint256", internalType: "uint256" },
+          ],
+          stateMutability: "payable",
+        },
+        {
+          type: "function",
+          name: "emergencyRefund",
+          inputs: [
+            { name: "_marketId", type: "uint256", internalType: "uint256" },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "getRequiredFee",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "hasClaimed",
+          inputs: [
+            { name: "marketId", type: "uint256", internalType: "uint256" },
+            { name: "bettor", type: "address", internalType: "address" },
+          ],
+          outputs: [{ name: "claimed", type: "bool", internalType: "bool" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "i_flrUsdFeedId",
+          inputs: [],
+          outputs: [{ name: "", type: "bytes21", internalType: "bytes21" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "i_ftsoV2",
+          inputs: [],
+          outputs: [
+            { name: "", type: "address", internalType: "contract IFtsoV2" },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "i_teeSigner",
+          inputs: [],
+          outputs: [{ name: "", type: "address", internalType: "address" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "marketCount",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "markets",
+          inputs: [
+            { name: "marketId", type: "uint256", internalType: "uint256" },
+          ],
+          outputs: [
+            { name: "owner", type: "address", internalType: "address" },
+            { name: "apiEndpoint", type: "string", internalType: "string" },
+            { name: "question", type: "string", internalType: "string" },
+            { name: "deadline", type: "uint256", internalType: "uint256" },
+            { name: "totalPool", type: "uint256", internalType: "uint256" },
+            { name: "resolved", type: "bool", internalType: "bool" },
+            { name: "outcome", type: "bool", internalType: "bool" },
+            { name: "merkleRoot", type: "bytes32", internalType: "bytes32" },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "owner",
+          inputs: [],
+          outputs: [{ name: "", type: "address", internalType: "address" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "predict",
+          inputs: [
+            { name: "_marketId", type: "uint256", internalType: "uint256" },
+            { name: "_encryptedChoice", type: "bytes", internalType: "bytes" },
+          ],
+          outputs: [],
+          stateMutability: "payable",
+        },
+        {
+          type: "function",
+          name: "resolveMarket",
+          inputs: [
+            { name: "_marketId", type: "uint256", internalType: "uint256" },
+            { name: "_merkleRoot", type: "bytes32", internalType: "bytes32" },
+            { name: "_outcome", type: "string", internalType: "string" },
+            { name: "_signature", type: "bytes", internalType: "bytes" },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "stakeOf",
+          inputs: [
+            { name: "marketId", type: "uint256", internalType: "uint256" },
+            { name: "bettor", type: "address", internalType: "address" },
+          ],
+          outputs: [
+            { name: "stake", type: "uint256", internalType: "uint256" },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "transferOwnership",
+          inputs: [
+            { name: "newOwner", type: "address", internalType: "address" },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "withdrawTreasury",
+          inputs: [{ name: "to", type: "address", internalType: "address" }],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "EmergencyRefunded",
+          inputs: [
+            {
+              name: "marketId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MarketCreated",
+          inputs: [
+            {
+              name: "marketId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "owner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "question",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+            {
+              name: "apiEndpoint",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+            {
+              name: "deadline",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "OwnershipTransferred",
+          inputs: [
+            {
+              name: "previousOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "newOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "PredictionPlaced",
+          inputs: [
+            {
+              name: "marketId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "encryptedChoice",
+              type: "bytes",
+              indexed: false,
+              internalType: "bytes",
+            },
+          ],
+          anonymous: false,
+        },
+        { type: "error", name: "AlreadyResolved", inputs: [] },
+        { type: "error", name: "DeadlineInPast", inputs: [] },
+        {
+          type: "error",
+          name: "DurationTooShort",
+          inputs: [
+            {
+              name: "earliestAllowedDeadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+        },
+        { type: "error", name: "EmptyEndpoint", inputs: [] },
+        { type: "error", name: "EmptyQuestion", inputs: [] },
+        {
+          type: "error",
+          name: "GracePeriodNotPassed",
+          inputs: [
+            {
+              name: "refundableAfter",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+        },
+        {
+          type: "error",
+          name: "InsufficientFee",
+          inputs: [
+            { name: "required", type: "uint256", internalType: "uint256" },
+            { name: "sent", type: "uint256", internalType: "uint256" },
+          ],
+        },
+        { type: "error", name: "InvalidOraclePrice", inputs: [] },
+        { type: "error", name: "MarketClosed", inputs: [] },
+        { type: "error", name: "MarketNotFound", inputs: [] },
+        { type: "error", name: "NegativeDecimals", inputs: [] },
+        { type: "error", name: "NotImplemented", inputs: [] },
+        { type: "error", name: "NotOwner", inputs: [] },
+        { type: "error", name: "NothingToWithdraw", inputs: [] },
+        { type: "error", name: "Reentrancy", inputs: [] },
+        { type: "error", name: "RefundFailed", inputs: [] },
+        {
+          type: "error",
+          name: "StalePrice",
+          inputs: [{ name: "age", type: "uint256", internalType: "uint256" }],
+        },
+        { type: "error", name: "TransferFailed", inputs: [] },
+        { type: "error", name: "ZeroAddress", inputs: [] },
+        { type: "error", name: "ZeroStake", inputs: [] },
       ];
 
       let provider, signer, contract;
 
       // 1. CONNECT WALLET
+      // 1. CONNECT WALLET
       document
         .getElementById("connectBtn")
         .addEventListener("click", async () => {
           if (!window.ethereum) return alert("Please install MetaMask.");
-          provider = new ethers.BrowserProvider(window.ethereum);
-          await provider.send("eth_requestAccounts", []);
-          signer = await provider.getSigner();
-          contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+          provider = createWalletClient({
+            chain: coston2,
+            transport: custom(window.ethereum),
+          }).extend(publicActions);
+
+          const accounts = await provider.requestAddresses();
+          signer = { address: accounts[0] };
+
+          contract = getContract({
+            address: CONTRACT_ADDRESS,
+            abi: ABI,
+            client: {
+              public: provider,
+              wallet: provider,
+            },
+          });
+          // ---------------- DEBUG ----------------
+
+          console.log("Chain ID:", await provider.getChainId());
+
+          console.log("Frontend Contract Address:", CONTRACT_ADDRESS);
+
+          console.log("Contract Owner:", await contract.read.owner());
+
+          console.log(
+            "Target USD Fee:",
+            (await contract.read.TARGET_USD_FEE()).toString(),
+          );
+
+          const code = await provider.getCode({
+            address: CONTRACT_ADDRESS,
+          });
+
+          console.log("Contract code:", code);
+
+          // ---------------- END DEBUG ----------------
+
           document.getElementById("walletStatus").innerText =
             `Connected: ${signer.address}`;
         });
@@ -129,17 +553,29 @@
 
             const targetMs = Date.now() + minutes * 60 * 1000;
             const deadlineSec = Math.floor(targetMs / 60000) * 60;
+            //Debug
+            console.log("FTSO Address:", await contract.read.i_ftsoV2());
+
+            console.log("Feed ID:", await contract.read.i_flrUsdFeedId());
+
+            console.log("TEE Signer:", await contract.read.i_teeSigner());
+
+            //end debug
 
             console.log("Fetching FTSO fee...");
-            const fee = await contract.getRequiredFee();
+            const fee = await contract.read.getRequiredFee();
 
             console.log("Sending Create Market TX...");
-            const tx = await contract.createMarket(
-              question,
-              deadlineSec,
-              endpoint,
-              { value: fee },
+            const hash = await contract.write.createMarket(
+              [question, BigInt(deadlineSec), endpoint],
+              { value: fee, account: signer.address },
             );
+            const tx = {
+              hash,
+              async wait() {
+                return await provider.waitForTransactionReceipt({ hash });
+              },
+            };
             await tx.wait();
             alert(`Market created! TX: ${tx.hash}`);
           } catch (err) {
@@ -158,14 +594,19 @@
             const choiceStr = document.getElementById("voteChoice").value;
             const flrAmount = document.getElementById("betAmount").value;
 
-            const encryptedChoiceHex = ethers.hexlify(
-              ethers.toUtf8Bytes(choiceStr),
-            );
-            const valueWei = ethers.parseEther(flrAmount);
+            const encryptedChoiceHex = stringToHex(choiceStr);
+            const valueWei = parseEther(flrAmount);
 
-            const tx = await contract.predict(marketId, encryptedChoiceHex, {
-              value: valueWei,
-            });
+            const hash = await contract.write.predict(
+              [BigInt(marketId), encryptedChoiceHex],
+              { value: valueWei, account: signer.address },
+            );
+            const tx = {
+              hash,
+              async wait() {
+                return await provider.waitForTransactionReceipt({ hash });
+              },
+            };
             await tx.wait();
             alert(`Prediction placed! TX: ${tx.hash}`);
           } catch (err) {
