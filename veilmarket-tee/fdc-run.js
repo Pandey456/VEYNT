@@ -57,7 +57,8 @@ async function prepareRequest() {
     }),
     body: "{}",
     // Binance klines return an array of arrays. Index [0][4] is the finalized close price.
-    postProcessJq: '{ price: (.[0][4] | gsub("[.]"; "") | tonumber) }',
+    postProcessJq:
+      '{ price: ((.[0][4] | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
     abiSignature: JSON.stringify({
       type: "tuple",
       components: [
