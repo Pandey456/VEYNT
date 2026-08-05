@@ -52,11 +52,10 @@ async function prepareRequest() {
     queryParams: JSON.stringify({
       symbol: "BTCUSDT",
       interval: "1m",
-      startTime: "1710000000000", // Hardcoded historical timestamp ensures static data
+      startTime: "1710000000000",
       limit: "1",
     }),
     body: "{}",
-    // Binance klines return an array of arrays. Index [0][4] is the finalized close price.
     postProcessJq:
       '{ price: ((.[0][4] | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
     abiSignature: JSON.stringify({
@@ -207,7 +206,11 @@ async function main() {
   await waitForFinalization(180); // Step 3
   const proof = await getProof(roundId, abiEncodedRequest); // Step 4
   console.log("ALL DONE — full proof:", JSON.stringify(proof, null, 2));
+  //added xtra
+  return proof;
 }
+// added xtra:
+module.exports = { main };
 
 main().catch((e) => {
   console.error("FAILED:", e.message);

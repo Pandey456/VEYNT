@@ -9,7 +9,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm install viem
-      - run: node veilmarket-tee/fdc-run.js
+      - run: npm install viem @openzeppelin/merkle-tree
+      - run: node veilmarket-tee/evaluator.js
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}

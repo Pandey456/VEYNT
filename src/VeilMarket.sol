@@ -239,11 +239,12 @@ contract VeilMarket {
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
         Market storage m = markets[_marketId];
-        if (!m.resolved) revert NotImplemented(); // Or custom error MarketNotResolved
+        if (!m.resolved) revert NotImplemented();
         if (hasClaimed[_marketId][msg.sender]) revert NothingToWithdraw();
+        bytes32 leaf = keccak256(
+            bytes.concat(keccak256(abi.encode(msg.sender, _payout)))
+        );
 
-        // Verify leaf node matches caller address and calculated payout
-        bytes32 leaf = keccak256(abi.encodePacked(msg.sender, _payout));
         require(
             MerkleProof.verify(_merkleProof, m.merkleRoot, leaf),
             "Invalid Merkle proof"
