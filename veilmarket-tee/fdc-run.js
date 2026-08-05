@@ -46,14 +46,18 @@ async function prepareRequest() {
   //   }),
   // };
   const requestBody = {
-    url: "https://data-api.binance.vision/api/v3/ticker/price",
+    url: "https://data-api.binance.vision/api/v3/klines",
     httpMethod: "GET",
     headers: "{}",
     queryParams: JSON.stringify({
       symbol: "BTCUSDT",
+      interval: "1m",
+      startTime: "1710000000000", // Hardcoded historical timestamp ensures static data
+      limit: "1",
     }),
     body: "{}",
-    postProcessJq: '{ price: (.price | gsub("[.]"; "") | tonumber) }',
+    // Binance klines return an array of arrays. Index [0][4] is the finalized close price.
+    postProcessJq: '{ price: (.[0][4] | gsub("[.]"; "") | tonumber) }',
     abiSignature: JSON.stringify({
       type: "tuple",
       components: [
