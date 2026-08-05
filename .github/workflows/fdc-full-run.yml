@@ -1,0 +1,30 @@
+name: FDC full run
+on:
+  workflow_dispatch:
+    inputs:
+      market_id:
+        description: "Market ID to evaluate and resolve"
+        required: true
+        default: "1"
+        type: string
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: npm install viem @openzeppelin/merkle-tree
+
+      - name: Run Evaluator Engine
+        run: node veilmarket-tee/evaluator.js
+        env:
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          TEE_PRIVATE_KEY: ${{ secrets.TEE_PRIVATE_KEY }}
+          VEIL_MARKET_ADDRESS: ${{ secrets.VEIL_MARKET_ADDRESS }}
+          MARKET_ID: ${{ inputs.market_id }}

@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VeilMarket Tester</title>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 20px;
+        background: #111;
+        color: #0f0;
+      }
+      div {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #333;
+      }
+      button,
+      input,
+      select {
+        background: #222;
+        color: #0f0;
+        border: 1px solid #0f0;
+        padding: 8px;
+        margin: 5px 0;
+      }
+      button:hover {
+        background: #0f0;
+        color: #111;
+        cursor: pointer;
+      }
+      input {
+        width: 320px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>VeilMarket - Frontend Tester</h2>
+
+    <div>
+      <h3>1. Connect Wallet</h3>
+      <button id="connectBtn">Connect MetaMask</button>
+      <p>Status: <span id="walletStatus">Not Connected</span></p>
+    </div>
+
+    <div>
+      <h3>2. Create Market</h3>
+      <label>Market Question:</label><br />
+      <input type="text" id="question" value="BTC|ABOVE|6500000000000" /><br />
+      <label>Deadline (Minutes from now):</label><br />
+      <input type="number" id="deadlineOffset" value="5" /><br />
+      <label>API Endpoint:</label><br />
+      <input
+        type="text"
+        id="endpoint"
+        value="https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1m"
+      /><br /><br />
+      <button id="createMarketBtn">Create Market (Costs FLR Fee)</button>
+    </div>
+
+    <div>
+      <h3>3. Predict (Bet)</h3>
+      <label>Market ID:</label><br />
+      <input type="number" id="marketId" value="1" /><br />
+      <label>Prediction Choice:</label><br />
+      <select id="voteChoice">
+        <option value="YES">YES</option>
+        <option value="NO">NO</option></select
+      ><br />
+      <label>Amount in FLR:</label><br />
+      <input type="number" id="betAmount" value="10" /><br /><br />
+      <button id="predictBtn">Place Prediction</button>
+    </div>
+
+    <div>
+      <h3>4. Trigger Finalize (GitHub Actions TEE)</h3>
+      <label>GitHub Owner / Repo (e.g. username/repo):</label><br />
+      <input type="text" id="ghRepo" placeholder="username/repository" /><br />
+      <label>GitHub Personal Access Token (PAT):</label><br />
+      <input
+        type="password"
+        id="ghToken"
+        placeholder="ghp_xxxxxxxxxxxx"
+      /><br />
+      <label>Market ID to Resolve:</label><br />
+      <input type="number" id="finalizeMarketId" value="1" /><br /><br />
+      <button id="finalizeBtn">Trigger TEE Finalize Workflow</button>
+      <p id="finalizeStatus"></p>
+    </div>
+
+    <script type="module">
+      import { ethers } from "https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.min.js";
+
+      const CONTRACT_ADDRESS = "0x12b4efc2ed4dd375c2695d98b5f6dcf6ab2b320d";
+
+      const ABI = [
+        "function getRequiredFee() view returns (uint256)",
+        "function createMarket(string _question, uint256 _deadline, string _apiEndpoint) payable returns (uint256)",
+        "function predict(uint256 _marketId, bytes _encryptedChoice) payable",
+      ];
+
+      let provider, signer, contract;
+
+      // 1. CONNECT WALLET
+      document
+        .getElementById("connectBtn")
+        .addEventListener("click", async () => {
+          if (!window.ethereum) return alert("Please install MetaMask.");
+          provider = new ethers.BrowserProvider(window.ethereum);
+          await provider.send("eth_requestAccounts", []);
+          signer = await provider.getSigner();
+          contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+          document.getElementById("walletStatus").innerText =
+            `Connected: ${signer.address}`;
+        });
+
+      // 2. CREATE MARKET
+      document
+        .getElementById("createMarketBtn")
+        .addEventListener("click", async () => {
+          if (!contract) return alert("Connect wallet first.");
+          try {
+            const question = document.getElementById("question").value;
+            const endpoint = document.getElementById("endpoint").value;
+            const minutes = parseInt(
+              document.getElementById("deadlineOffset").value,
+            );
+
+            const targetMs = Date.now() + minutes * 60 * 1000;
+            const deadlineSec = Math.floor(targetMs / 60000) * 60;
+
+            console.log("Fetching FTSO fee...");
+            const fee = await contract.getRequiredFee();
+
+            console.log("Sending Create Market TX...");
+            const tx = await contract.createMarket(
+              question,
+              deadlineSec,
+              endpoint,
+              { value: fee },
+            );
+            await tx.wait();
+            alert(`Market created! TX: ${tx.hash}`);
+          } catch (err) {
+            console.error(err);
+            alert("Failed: " + err.message);
+          }
+        });
+
+      // 3. PREDICT
+      document
+        .getElementById("predictBtn")
+        .addEventListener("click", async () => {
+          if (!contract) return alert("Connect wallet first.");
+          try {
+            const marketId = document.getElementById("marketId").value;
+            const choiceStr = document.getElementById("voteChoice").value;
+            const flrAmount = document.getElementById("betAmount").value;
+
+            const encryptedChoiceHex = ethers.hexlify(
+              ethers.toUtf8Bytes(choiceStr),
+            );
+            const valueWei = ethers.parseEther(flrAmount);
+
+            const tx = await contract.predict(marketId, encryptedChoiceHex, {
+              value: valueWei,
+            });
+            await tx.wait();
+            alert(`Prediction placed! TX: ${tx.hash}`);
+          } catch (err) {
+            console.error(err);
+            alert("Failed: " + err.message);
+          }
+        });
+
+      // 4. TRIGGER FINALIZE (GITHUB ACTIONS)
+      document
+        .getElementById("finalizeBtn")
+        .addEventListener("click", async () => {
+          const repo = document.getElementById("ghRepo").value.trim();
+          const token = document.getElementById("ghToken").value.trim();
+          const marketId = document.getElementById("finalizeMarketId").value;
+          const statusEl = document.getElementById("finalizeStatus");
+
+          if (!repo || !token) {
+            return alert(
+              "Please enter both GitHub Repo (owner/repo) and PAT Token.",
+            );
+          }
+
+          statusEl.innerText = "Triggering GitHub Actions workflow...";
+
+          try {
+            const response = await fetch(
+              `https://api.github.com/repos/${repo}/actions/workflows/fdc-full-run.yml/dispatches`,
+              {
+                method: "POST",
+                headers: {
+                  Accept: "application/vnd.github.v3+json",
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  ref: "main",
+                  inputs: { market_id: marketId.toString() },
+                }),
+              },
+            );
+
+            if (response.status === 204) {
+              statusEl.innerText =
+                "✅ Workflow triggered successfully! Check your GitHub Actions tab for live logs.";
+            } else {
+              const errData = await response.json();
+              statusEl.innerText = `❌ Error (${response.status}): ${errData.message}`;
+            }
+          } catch (err) {
+            console.error(err);
+            statusEl.innerText = "❌ Network error triggering workflow.";
+          }
+        });
+    </script>
+  </body>
+</html>

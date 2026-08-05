@@ -52,7 +52,8 @@ async function prepareRequest() {
     queryParams: JSON.stringify({
       symbol: "BTCUSDT",
       interval: "1m",
-      startTime: "1710000000000",
+      startTime: process.env.MARKET_DEADLINE_MS,
+      //startTime: "1710000000000",
       limit: "1",
     }),
     body: "{}",
