@@ -77,19 +77,47 @@ async function runProductionEvaluator() {
     args: [MARKET_ID],
   });
 
-  if (market.owner === "0x0000000000000000000000000000000000000000")
-    throw new Error("Market does not exist.");
-  if (market.resolved) throw new Error("Market already resolved.");
-  console.log(market);
+  console.log("Raw Market:", market);
 
-  // Parse target from question: e.g. "BTC|ABOVE|6500000000000"
-  const parts = market.question.split("|");
+  // Convert tuple to object
+  const marketData = {
+    owner: market[0],
+    apiEndpoint: market[1],
+    question: market[2],
+    deadline: market[3],
+    totalPool: market[4],
+    resolved: market[5],
+    outcome: market[6],
+    merkleRoot: market[7],
+  };
+
+  // Validate market
+  if (marketData.owner === "0x0000000000000000000000000000000000000000") {
+    throw new Error("Market does not exist.");
+  }
+
+  if (marketData.resolved) {
+    throw new Error("Market already resolved.");
+  }
+
+  // Parse target from question
+  // Example: "BTC|ABOVE|6500000000000"
+  const parts = marketData.question.split("|");
+
+  if (parts.length !== 3) {
+    throw new Error(`Invalid market question format: ${marketData.question}`);
+  }
+
   const direction = parts[1].toUpperCase();
   const targetPrice = BigInt(parts[2]);
 
-  // Set the FDC target timestamp dynamically in the environment
-  process.env.MARKET_DEADLINE_MS = (Number(market.deadline) * 1000).toString();
+  // Set the FDC target timestamp dynamically
+  process.env.MARKET_DEADLINE_MS = (
+    Number(marketData.deadline) * 1000
+  ).toString();
 
+  console.log(`Question:      ${marketData.question}`);
+  console.log(`API Endpoint:  ${marketData.apiEndpoint}`);
   console.log(`Target Price:  $${Number(targetPrice) / 1e8}`);
   console.log(`Condition:     ${direction}`);
   console.log(`Deadline Set:  ${process.env.MARKET_DEADLINE_MS}`);
