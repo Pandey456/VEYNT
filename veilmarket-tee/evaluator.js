@@ -6,7 +6,7 @@ const { main: runFdc } = require("./fdc-run.js");
 // =========================================================================
 const TEST_CONFIG = {
   // Target price in USD (e.g. 65000 or 70000)
-  targetPriceUsd: 65000,
+  targetPriceUsd: 70000,
 
   // Prediction Direction: "ABOVE" or "BELOW"
   direction: "ABOVE",
