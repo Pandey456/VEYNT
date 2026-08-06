@@ -114,7 +114,7 @@
         },
       });
 
-      const CONTRACT_ADDRESS = "0x3A5CCd3f6BfA8626dCd7454EaA1009B82E10e0fD";
+      const CONTRACT_ADDRESS = "0x01D4D4a3F11E65888B453CE655B5b478D921E87f";
 
       const ABI = [
         {
@@ -461,6 +461,33 @@
               internalType: "uint256",
             },
           ],
+        },
+        {
+          type: "function",
+          name: "getBettors",
+          stateMutability: "view",
+          inputs: [{ type: "uint256", name: "marketId" }],
+          outputs: [{ type: "address[]" }],
+        },
+        {
+          type: "function",
+          name: "getPrediction",
+          stateMutability: "view",
+          inputs: [
+            { type: "uint256", name: "marketId" },
+            { type: "address", name: "bettor" },
+          ],
+          outputs: [{ type: "bytes" }],
+        },
+        {
+          type: "function",
+          name: "stakeOf",
+          stateMutability: "view",
+          inputs: [
+            { type: "uint256", name: "marketId" },
+            { type: "address", name: "bettor" },
+          ],
+          outputs: [{ type: "uint256" }],
         },
         {
           type: "error",

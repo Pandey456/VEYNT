@@ -142,42 +142,54 @@ async function runProductionEvaluator() {
   }
   console.log(`Winning Side: [ ${winningOutcome} ]`);
 
-  // 4. FETCH PREDICTION EVENTS
-  const logs = await publicClient.getLogs({
+  // 4. FETCH BETTORS FROM CONTRACT
+
+  const bettors = await publicClient.readContract({
     address: VEIL_MARKET_ADDRESS,
-    event: parseAbiItem(
-      "event PredictionPlaced(uint256 indexed marketId, address indexed bettor, uint256 amount, bytes encryptedChoice)",
-    ),
-    args: { marketId: MARKET_ID },
-    fromBlock: "earliest",
+    abi: VEIL_MARKET_ABI,
+    functionName: "getBettors",
+    args: [MARKET_ID],
   });
+
+  console.log(`Found ${bettors.length} bettors`);
 
   let totalPoolWei = 0n;
   let winningPoolWei = 0n;
   const winners = [];
 
-  for (const log of logs) {
-    const bettor = log.args.bettor;
-    const amount = BigInt(log.args.amount);
+  for (const bettor of bettors) {
+    const stake = await publicClient.readContract({
+      address: VEIL_MARKET_ADDRESS,
+      abi: VEIL_MARKET_ABI,
+      functionName: "stakeOf",
+      args: [MARKET_ID, bettor],
+    });
 
-    // Convert hex payload back to plain string ("YES" or "NO")
-    const choice = Buffer.from(
-      log.args.encryptedChoice.slice(2),
-      "hex",
-    ).toString("utf8");
+    const encodedChoice = await publicClient.readContract({
+      address: VEIL_MARKET_ADDRESS,
+      abi: VEIL_MARKET_ABI,
+      functionName: "getPrediction",
+      args: [MARKET_ID, bettor],
+    });
 
-    totalPoolWei += amount;
+    const choice = Buffer.from(encodedChoice.slice(2), "hex").toString("utf8");
+
+    console.log(`Bettor: ${bettor}, Stake: ${stake}, Choice: ${choice}`);
+
+    totalPoolWei += stake;
+
     if (choice === winningOutcome) {
-      winningPoolWei += amount;
-      winners.push({ bettor, amount });
+      winningPoolWei += stake;
+
+      winners.push({
+        bettor,
+        amount: stake,
+      });
     }
   }
 
-  if (winningPoolWei === 0n) {
-    console.log("No winning bets found. Aborting payout generation.");
-    return;
-  }
-
+  console.log("Total Pool:", totalPoolWei.toString());
+  console.log("Winning Pool:", winningPoolWei.toString());
   // 5. CALCULATE 86% PRO-RATA PAYOUTS & MERKLE TREE
   const distributablePool = (totalPoolWei * 86n) / 100n;
   const merkleLeaves = winners.map((w) => [

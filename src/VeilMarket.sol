@@ -72,7 +72,9 @@ contract VeilMarket {
     uint256 public accumulatedTreasuryFees;
     mapping(uint256 marketId => mapping(address bettor => uint256 stake))
         public stakeOf;
-
+    mapping(uint256 => address[]) public bettors;
+    mapping(uint256 => mapping(address => bool)) public hasBet;
+    mapping(uint256 => mapping(address => bytes)) public predictionOf;
     // Events
     event MarketCreated(
         uint256 indexed marketId,
@@ -176,7 +178,13 @@ contract VeilMarket {
         if (block.timestamp >= m.deadline) revert MarketClosed();
         if (msg.value == 0) revert ZeroStake();
 
+        if (!hasBet[_marketId][msg.sender]) {
+            hasBet[_marketId][msg.sender] = true;
+            bettors[_marketId].push(msg.sender);
+        }
+
         stakeOf[_marketId][msg.sender] += msg.value;
+        predictionOf[_marketId][msg.sender] = _encryptedChoice;
         m.totalPool += msg.value;
 
         emit PredictionPlaced(
@@ -298,6 +306,19 @@ contract VeilMarket {
         // price = flrPrice / 10^decimals  ->  requiredWei = 13e18 * 10^decimals / flrPrice
         uint256 multiplier = 10 ** uint256(uint8(decimals)); // safe: decimals >= 0
         return (TARGET_USD_FEE * multiplier) / flrPrice;
+    }
+
+    function getBettors(
+        uint256 marketId
+    ) external view returns (address[] memory) {
+        return bettors[marketId];
+    }
+
+    function getPrediction(
+        uint256 marketId,
+        address bettor
+    ) external view returns (bytes memory) {
+        return predictionOf[marketId][bettor];
     }
 
     //ADMIN
