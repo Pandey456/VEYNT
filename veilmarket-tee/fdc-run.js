@@ -211,9 +211,17 @@ async function main() {
   return proof;
 }
 // added xtra:
+// module.exports = { main };
+
+// main().catch((e) => {
+//   console.error("FAILED:", e.message);
+//   process.exit(1);
+// });
 module.exports = { main };
 
-main().catch((e) => {
-  console.error("FAILED:", e.message);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((e) => {
+    console.error("FAILED:", e.message);
+    process.exit(1);
+  });
+}
