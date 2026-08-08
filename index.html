@@ -590,7 +590,19 @@
             //end debug
 
             console.log("Fetching FTSO fee...");
-            const fee = await contract.read.getRequiredFee();
+
+            //const fee = await contract.read.getRequiredFee();
+            const feeweGOt = await contract.read.getRequiredFee();
+
+            const fee = feeweGOt + (feeweGOt * 5n) / 100n;
+
+            console.log("Fee just before tx:", fee.toString());
+
+            await new Promise((r) => setTimeout(r, 5000));
+
+            const feeAgain = await contract.read.getRequiredFee();
+
+            console.log("Fee 5 seconds later:", feeAgain.toString());
 
             console.log("Sending Create Market TX...");
             const hash = await contract.write.createMarket(
