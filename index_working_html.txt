@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VeilMarket Tester</title>
+    <style>
+      body {
+        font-family: monospace;
+        padding: 20px;
+        background: #111;
+        color: #0f0;
+      }
+      div {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #333;
+      }
+      button,
+      input,
+      select {
+        background: #222;
+        color: #0f0;
+        border: 1px solid #0f0;
+        padding: 8px;
+        margin: 5px 0;
+      }
+      button:hover {
+        background: #0f0;
+        color: #111;
+        cursor: pointer;
+      }
+      input {
+        width: 320px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>VeilMarket - Frontend Tester</h2>
+
+    <div>
+      <h3>1. Connect Wallet</h3>
+      <button id="connectBtn">Connect MetaMask</button>
+      <p>Status: <span id="walletStatus">Not Connected</span></p>
+    </div>
+
+    <div>
+      <h3>2. Create Market</h3>
+      <label>Market Question:</label><br />
+      <input type="text" id="question" value="BTC|ABOVE|6500000000000" /><br />
+      <label>Deadline (Minutes from now):</label><br />
+      <input type="number" id="deadlineOffset" value="5" /><br />
+      <label>API Endpoint:</label><br />
+      <input
+        type="text"
+        id="endpoint"
+        value="https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1m"
+      /><br /><br />
+      <button id="createMarketBtn">Create Market (Costs FLR Fee)</button>
+    </div>
+
+    <div>
+      <h3>3. Predict (Bet)</h3>
+      <label>Market ID:</label><br />
+      <input type="number" id="marketId" value="1" /><br />
+      <label>Prediction Choice:</label><br />
+      <select id="voteChoice">
+        <option value="YES">YES</option>
+        <option value="NO">NO</option></select
+      ><br />
+      <label>Amount in FLR:</label><br />
+      <input type="number" id="betAmount" value="10" /><br /><br />
+      <button id="predictBtn">Place Prediction</button>
+    </div>
+
+    <div>
+      <h3>4. Trigger Finalize (GitHub Actions TEE)</h3>
+      <label>GitHub Owner / Repo (e.g. username/repo):</label><br />
+      <input type="text" id="ghRepo" placeholder="username/repository" /><br />
+      <label>GitHub Personal Access Token (PAT):</label><br />
+      <input
+        type="password"
+        id="ghToken"
+        placeholder="ghp_xxxxxxxxxxxx"
+      /><br />
+      <label>Market ID to Resolve:</label><br />
+      <input type="number" id="finalizeMarketId" value="1" /><br /><br />
+      <button id="finalizeBtn">Trigger TEE Finalize Workflow</button>
+      <p id="finalizeStatus"></p>
+    </div>
+    <!-- ================= CLAIM PAYOUT ================= -->
+    <div>
+      <h3>5. Claim Payout</h3>
+
+      <label>Market ID:</label><br />
+      <input type="number" id="claimMarketId" value="1" /><br />
+
+      <label>Payout Amount (FLR):</label><br />
+      <input type="number" id="claimPayout" placeholder="e.g. 17.2" /><br />
+
+      <label>Merkle Proof:</label><br />
+      <textarea
+        id="claimProof"
+        placeholder='["0x...", "0x..."]'
+        style="
+          width: 320px;
+          height: 80px;
+          background: #222;
+          color: #0f0;
+          border: 1px solid #0f0;
+        "
+      ></textarea>
+      <br />
+
+      <button id="claimBtn">Claim Payout</button>
+
+      <p id="claimStatus"></p>
+    </div>
+
+    <!-- ================= ADMIN ================= -->
+    <div>
+      <h3>6. Admin</h3>
+
+      <p>
+        Connected Owner:
+        <span id="contractOwner">Checking...</span>
+      </p>
+
+      <label>Treasury Withdrawal Address:</label><br />
+      <input type="text" id="withdrawAddress" placeholder="0x..." /><br />
+
+      <button id="withdrawTreasuryBtn">Withdraw Treasury</button>
+
+      <p id="adminStatus"></p>
+    </div>
+    <script type="module">
+      import {
+        createWalletClient,
+        custom,
+        getContract,
+        parseEther,
+        stringToHex,
+        publicActions,
+        defineChain,
+      } from "https://esm.sh/viem@2.55.11";
+
+      const coston2 = defineChain({
+        id: 114,
+        name: "Flare Coston2",
+        nativeCurrency: {
+          name: "Coston2 FLR",
+          symbol: "C2FLR",
+          decimals: 18,
+        },
+        rpcUrls: {
+          default: {
+            http: ["https://coston2-api.flare.network/ext/C/rpc"],
+          },
+        },
+      });
+
+      const CONTRACT_ADDRESS = "0x01D4D4a3F11E65888B453CE655B5b478D921E87f";
+
+      const ABI = [
+        {
+          type: "constructor",
+          inputs: [
+            {
+              name: "_ftsoV2Address",
+              type: "address",
+              internalType: "address",
+            },
+            { name: "_flrUsdFeedId", type: "bytes21", internalType: "bytes21" },
+            { name: "_teeSigner", type: "address", internalType: "address" },
+          ],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "MAX_PRICE_AGE",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "MIN_MARKET_DURATION",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "RESOLUTION_GRACE",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "TARGET_USD_FEE",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "accumulatedTreasuryFees",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "claimPayout",
+          inputs: [
+            { name: "_marketId", type: "uint256", internalType: "uint256" },
+            { name: "_payout", type: "uint256", internalType: "uint256" },
+            {
+              name: "_merkleProof",
+              type: "bytes32[]",
+              internalType: "bytes32[]",
+            },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "createMarket",
+          inputs: [
+            { name: "_question", type: "string", internalType: "string" },
+            { name: "_deadline", type: "uint256", internalType: "uint256" },
+            { name: "_apiEndpoint", type: "string", internalType: "string" },
+          ],
+          outputs: [
+            { name: "marketId", type: "uint256", internalType: "uint256" },
+          ],
+          stateMutability: "payable",
+        },
+        {
+          type: "function",
+          name: "emergencyRefund",
+          inputs: [
+            { name: "_marketId", type: "uint256", internalType: "uint256" },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "getRequiredFee",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "hasClaimed",
+          inputs: [
+            { name: "marketId", type: "uint256", internalType: "uint256" },
+            { name: "bettor", type: "address", internalType: "address" },
+          ],
+          outputs: [{ name: "claimed", type: "bool", internalType: "bool" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "i_flrUsdFeedId",
+          inputs: [],
+          outputs: [{ name: "", type: "bytes21", internalType: "bytes21" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "i_ftsoV2",
+          inputs: [],
+          outputs: [
+            { name: "", type: "address", internalType: "contract IFtsoV2" },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "i_teeSigner",
+          inputs: [],
+          outputs: [{ name: "", type: "address", internalType: "address" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "marketCount",
+          inputs: [],
+          outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "markets",
+          inputs: [
+            { name: "marketId", type: "uint256", internalType: "uint256" },
+          ],
+          outputs: [
+            { name: "owner", type: "address", internalType: "address" },
+            { name: "apiEndpoint", type: "string", internalType: "string" },
+            { name: "question", type: "string", internalType: "string" },
+            { name: "deadline", type: "uint256", internalType: "uint256" },
+            { name: "totalPool", type: "uint256", internalType: "uint256" },
+            { name: "resolved", type: "bool", internalType: "bool" },
+            { name: "outcome", type: "bool", internalType: "bool" },
+            { name: "merkleRoot", type: "bytes32", internalType: "bytes32" },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "owner",
+          inputs: [],
+          outputs: [{ name: "", type: "address", internalType: "address" }],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "predict",
+          inputs: [
+            { name: "_marketId", type: "uint256", internalType: "uint256" },
+            { name: "_encryptedChoice", type: "bytes", internalType: "bytes" },
+          ],
+          outputs: [],
+          stateMutability: "payable",
+        },
+        {
+          type: "function",
+          name: "resolveMarket",
+          inputs: [
+            { name: "_marketId", type: "uint256", internalType: "uint256" },
+            { name: "_merkleRoot", type: "bytes32", internalType: "bytes32" },
+            { name: "_outcome", type: "string", internalType: "string" },
+            { name: "_signature", type: "bytes", internalType: "bytes" },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "stakeOf",
+          inputs: [
+            { name: "marketId", type: "uint256", internalType: "uint256" },
+            { name: "bettor", type: "address", internalType: "address" },
+          ],
+          outputs: [
+            { name: "stake", type: "uint256", internalType: "uint256" },
+          ],
+          stateMutability: "view",
+        },
+        {
+          type: "function",
+          name: "transferOwnership",
+          inputs: [
+            { name: "newOwner", type: "address", internalType: "address" },
+          ],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "function",
+          name: "withdrawTreasury",
+          inputs: [{ name: "to", type: "address", internalType: "address" }],
+          outputs: [],
+          stateMutability: "nonpayable",
+        },
+        {
+          type: "event",
+          name: "EmergencyRefunded",
+          inputs: [
+            {
+              name: "marketId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "MarketCreated",
+          inputs: [
+            {
+              name: "marketId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "owner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "question",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+            {
+              name: "apiEndpoint",
+              type: "string",
+              indexed: false,
+              internalType: "string",
+            },
+            {
+              name: "deadline",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "OwnershipTransferred",
+          inputs: [
+            {
+              name: "previousOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "newOwner",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+          ],
+          anonymous: false,
+        },
+        {
+          type: "event",
+          name: "PredictionPlaced",
+          inputs: [
+            {
+              name: "marketId",
+              type: "uint256",
+              indexed: true,
+              internalType: "uint256",
+            },
+            {
+              name: "bettor",
+              type: "address",
+              indexed: true,
+              internalType: "address",
+            },
+            {
+              name: "amount",
+              type: "uint256",
+              indexed: false,
+              internalType: "uint256",
+            },
+            {
+              name: "encryptedChoice",
+              type: "bytes",
+              indexed: false,
+              internalType: "bytes",
+            },
+          ],
+          anonymous: false,
+        },
+        { type: "error", name: "AlreadyResolved", inputs: [] },
+        { type: "error", name: "DeadlineInPast", inputs: [] },
+        {
+          type: "error",
+          name: "DurationTooShort",
+          inputs: [
+            {
+              name: "earliestAllowedDeadline",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+        },
+        { type: "error", name: "EmptyEndpoint", inputs: [] },
+        { type: "error", name: "EmptyQuestion", inputs: [] },
+        {
+          type: "error",
+          name: "GracePeriodNotPassed",
+          inputs: [
+            {
+              name: "refundableAfter",
+              type: "uint256",
+              internalType: "uint256",
+            },
+          ],
+        },
+        {
+          type: "function",
+          name: "getBettors",
+          stateMutability: "view",
+          inputs: [{ type: "uint256", name: "marketId" }],
+          outputs: [{ type: "address[]" }],
+        },
+        {
+          type: "function",
+          name: "getPrediction",
+          stateMutability: "view",
+          inputs: [
+            { type: "uint256", name: "marketId" },
+            { type: "address", name: "bettor" },
+          ],
+          outputs: [{ type: "bytes" }],
+        },
+        {
+          type: "function",
+          name: "stakeOf",
+          stateMutability: "view",
+          inputs: [
+            { type: "uint256", name: "marketId" },
+            { type: "address", name: "bettor" },
+          ],
+          outputs: [{ type: "uint256" }],
+        },
+        {
+          type: "error",
+          name: "InsufficientFee",
+          inputs: [
+            { name: "required", type: "uint256", internalType: "uint256" },
+            { name: "sent", type: "uint256", internalType: "uint256" },
+          ],
+        },
+        { type: "error", name: "InvalidOraclePrice", inputs: [] },
+        { type: "error", name: "MarketClosed", inputs: [] },
+        { type: "error", name: "MarketNotFound", inputs: [] },
+        { type: "error", name: "NegativeDecimals", inputs: [] },
+        { type: "error", name: "NotImplemented", inputs: [] },
+        { type: "error", name: "NotOwner", inputs: [] },
+        { type: "error", name: "NothingToWithdraw", inputs: [] },
+        { type: "error", name: "Reentrancy", inputs: [] },
+        { type: "error", name: "RefundFailed", inputs: [] },
+        {
+          type: "error",
+          name: "StalePrice",
+          inputs: [{ name: "age", type: "uint256", internalType: "uint256" }],
+        },
+        { type: "error", name: "TransferFailed", inputs: [] },
+        { type: "error", name: "ZeroAddress", inputs: [] },
+        { type: "error", name: "ZeroStake", inputs: [] },
+
+        {
+          type: "function",
+          name: "owner",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [
+            {
+              type: "address",
+            },
+          ],
+        },
+
+        {
+          type: "function",
+          name: "claimPayout",
+          stateMutability: "nonpayable",
+          inputs: [
+            {
+              name: "_marketId",
+              type: "uint256",
+            },
+            {
+              name: "_payout",
+              type: "uint256",
+            },
+            {
+              name: "_merkleProof",
+              type: "bytes32[]",
+            },
+          ],
+          outputs: [],
+        },
+
+        {
+          type: "function",
+          name: "withdrawTreasury",
+          stateMutability: "nonpayable",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+            },
+          ],
+          outputs: [],
+        },
+      ];
+
+      let provider, signer, contract;
+
+      // 1. CONNECT WALLET
+      // 1. CONNECT WALLET
+      document
+        .getElementById("connectBtn")
+        .addEventListener("click", async () => {
+          if (!window.ethereum) return alert("Please install MetaMask.");
+
+          provider = createWalletClient({
+            chain: coston2,
+            transport: custom(window.ethereum),
+          }).extend(publicActions);
+
+          const accounts = await provider.requestAddresses();
+          signer = { address: accounts[0] };
+
+          contract = getContract({
+            address: CONTRACT_ADDRESS,
+            abi: ABI,
+            client: {
+              public: provider,
+              wallet: provider,
+            },
+          });
+          // ---------------- DEBUG ----------------
+
+          console.log("Chain ID:", await provider.getChainId());
+
+          console.log("Frontend Contract Address:", CONTRACT_ADDRESS);
+
+          console.log("Contract Owner:", await contract.read.owner());
+
+          console.log(
+            "Target USD Fee:",
+            (await contract.read.TARGET_USD_FEE()).toString(),
+          );
+
+          const code = await provider.getCode({
+            address: CONTRACT_ADDRESS,
+          });
+
+          console.log("Contract code:", code);
+
+          // ---------------- END DEBUG ----------------
+
+          document.getElementById("walletStatus").innerText =
+            `Connected: ${signer.address}`;
+        });
+
+      // 2. CREATE MARKET
+      document
+        .getElementById("createMarketBtn")
+        .addEventListener("click", async () => {
+          if (!contract) return alert("Connect wallet first.");
+          try {
+            const question = document.getElementById("question").value;
+            const endpoint = document.getElementById("endpoint").value;
+            const minutes = parseInt(
+              document.getElementById("deadlineOffset").value,
+            );
+
+            const targetMs = Date.now() + minutes * 60 * 1000;
+            const deadlineSec = Math.floor(targetMs / 60000) * 60;
+            //Debug
+            console.log("FTSO Address:", await contract.read.i_ftsoV2());
+
+            console.log("Feed ID:", await contract.read.i_flrUsdFeedId());
+
+            console.log("TEE Signer:", await contract.read.i_teeSigner());
+
+            //end debug
+
+            console.log("Fetching FTSO fee...");
+
+            //const fee = await contract.read.getRequiredFee();
+            const feeweGOt = await contract.read.getRequiredFee();
+
+            const fee = feeweGOt + (feeweGOt * 5n) / 100n;
+
+            console.log("Fee just before tx:", fee.toString());
+
+            await new Promise((r) => setTimeout(r, 5000));
+
+            const feeAgain = await contract.read.getRequiredFee();
+
+            console.log("Fee 5 seconds later:", feeAgain.toString());
+
+            console.log("Sending Create Market TX...");
+            const hash = await contract.write.createMarket(
+              [question, BigInt(deadlineSec), endpoint],
+              { value: fee, account: signer.address },
+            );
+            const tx = {
+              hash,
+              async wait() {
+                return await provider.waitForTransactionReceipt({ hash });
+              },
+            };
+            await tx.wait();
+            alert(`Market created! TX: ${tx.hash}`);
+          } catch (err) {
+            console.error(err);
+            alert("Failed: " + err.message);
+          }
+        });
+
+      // 3. PREDICT
+      document
+        .getElementById("predictBtn")
+        .addEventListener("click", async () => {
+          if (!contract) return alert("Connect wallet first.");
+          try {
+            const marketId = document.getElementById("marketId").value;
+            const choiceStr = document.getElementById("voteChoice").value;
+            const flrAmount = document.getElementById("betAmount").value;
+
+            const encryptedChoiceHex = stringToHex(choiceStr);
+            const valueWei = parseEther(flrAmount);
+
+            const hash = await contract.write.predict(
+              [BigInt(marketId), encryptedChoiceHex],
+              { value: valueWei, account: signer.address },
+            );
+            const tx = {
+              hash,
+              async wait() {
+                return await provider.waitForTransactionReceipt({ hash });
+              },
+            };
+            await tx.wait();
+            alert(`Prediction placed! TX: ${tx.hash}`);
+          } catch (err) {
+            console.error(err);
+            alert("Failed: " + err.message);
+          }
+        });
+
+      // 4. TRIGGER FINALIZE (GITHUB ACTIONS)
+      document
+        .getElementById("finalizeBtn")
+        .addEventListener("click", async () => {
+          const repo = document.getElementById("ghRepo").value.trim();
+          const token = document.getElementById("ghToken").value.trim();
+          const marketId = document.getElementById("finalizeMarketId").value;
+          const statusEl = document.getElementById("finalizeStatus");
+
+          if (!repo || !token) {
+            return alert(
+              "Please enter both GitHub Repo (owner/repo) and PAT Token.",
+            );
+          }
+
+          statusEl.innerText = "Triggering GitHub Actions workflow...";
+
+          try {
+            const response = await fetch(
+              `https://api.github.com/repos/${repo}/actions/workflows/fdc-full-run.yml/dispatches`,
+              {
+                method: "POST",
+                headers: {
+                  Accept: "application/vnd.github.v3+json",
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  ref: "main",
+                  inputs: { market_id: marketId.toString() },
+                }),
+              },
+            );
+
+            if (response.status === 204) {
+              statusEl.innerText =
+                "✅ Workflow triggered successfully! Check your GitHub Actions tab for live logs.";
+            } else {
+              const errData = await response.json();
+              statusEl.innerText = `❌ Error (${response.status}): ${errData.message}`;
+            }
+          } catch (err) {
+            console.error(err);
+            statusEl.innerText = "❌ Network error triggering workflow.";
+          }
+        });
+      // ============================================================
+      // CLAIM PAYOUT
+      // ============================================================
+
+      document
+        .getElementById("claimBtn")
+        .addEventListener("click", async () => {
+          if (!contract) {
+            return alert("Connect wallet first.");
+          }
+
+          const statusEl = document.getElementById("claimStatus");
+
+          try {
+            const marketId = BigInt(
+              document.getElementById("claimMarketId").value,
+            );
+
+            const payoutFlr = document.getElementById("claimPayout").value;
+
+            const proofInput = document
+              .getElementById("claimProof")
+              .value.trim();
+
+            if (!payoutFlr) {
+              throw new Error("Enter payout amount.");
+            }
+
+            if (!proofInput) {
+              throw new Error("Enter Merkle proof.");
+            }
+
+            let proof;
+
+            try {
+              proof = JSON.parse(proofInput);
+            } catch {
+              throw new Error(
+                'Invalid Merkle proof JSON. Example: ["0x...", "0x..."]',
+              );
+            }
+
+            const payoutWei = parseEther(payoutFlr);
+
+            statusEl.innerText = "Submitting claim transaction...";
+
+            const hash = await contract.write.claimPayout(
+              [marketId, payoutWei, proof],
+              {
+                account: signer.address,
+              },
+            );
+
+            statusEl.innerText = `Transaction submitted: ${hash}`;
+
+            const receipt = await provider.waitForTransactionReceipt({
+              hash,
+            });
+
+            if (receipt.status === "success") {
+              statusEl.innerText = `✅ Payout claimed successfully!\nTX: ${hash}`;
+            } else {
+              statusEl.innerText = "❌ Claim transaction failed.";
+            }
+          } catch (err) {
+            console.error(err);
+
+            statusEl.innerText = `❌ Claim failed: ${err.shortMessage || err.message}`;
+          }
+        });
+
+      // ============================================================
+      // ADMIN — CHECK OWNER
+      // ============================================================
+
+      async function checkAdmin() {
+        if (!contract) return;
+
+        try {
+          const owner = await contract.read.owner();
+
+          const ownerEl = document.getElementById("contractOwner");
+
+          ownerEl.innerText = owner;
+
+          if (owner.toLowerCase() !== signer.address.toLowerCase()) {
+            document.getElementById("withdrawTreasuryBtn").disabled = true;
+
+            document.getElementById("adminStatus").innerText =
+              "Connected wallet is not the contract owner.";
+          } else {
+            document.getElementById("adminStatus").innerText =
+              "✅ Connected wallet is contract owner.";
+          }
+        } catch (err) {
+          console.error("Failed to check owner:", err);
+        }
+      }
+
+      // ============================================================
+      // ADMIN — WITHDRAW TREASURY
+      // ============================================================
+
+      document
+        .getElementById("withdrawTreasuryBtn")
+        .addEventListener("click", async () => {
+          if (!contract) {
+            return alert("Connect wallet first.");
+          }
+
+          const statusEl = document.getElementById("adminStatus");
+
+          try {
+            const owner = await contract.read.owner();
+
+            if (owner.toLowerCase() !== signer.address.toLowerCase()) {
+              throw new Error(
+                "Only the contract owner can withdraw treasury funds.",
+              );
+            }
+
+            const to = document.getElementById("withdrawAddress").value.trim();
+
+            if (!to) {
+              throw new Error("Enter withdrawal address.");
+            }
+
+            statusEl.innerText = "Submitting treasury withdrawal...";
+
+            const hash = await contract.write.withdrawTreasury([to], {
+              account: signer.address,
+            });
+
+            statusEl.innerText = `Transaction submitted: ${hash}`;
+
+            const receipt = await provider.waitForTransactionReceipt({
+              hash,
+            });
+
+            if (receipt.status === "success") {
+              statusEl.innerText = `✅ Treasury withdrawn successfully!\nTX: ${hash}`;
+            } else {
+              statusEl.innerText = "❌ Treasury withdrawal failed.";
+            }
+          } catch (err) {
+            console.error(err);
+
+            statusEl.innerText = `❌ Withdrawal failed: ${
+              err.shortMessage || err.message
+            }`;
+          }
+        });
+    </script>
+  </body>
+</html>

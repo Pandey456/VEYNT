@@ -585,6 +585,43 @@
       </div>
     </div>
 
+    <div class="modal-bg" id="resolveModal">
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <h3>Resolve market</h3>
+            <p>
+              Enter a GitHub Personal Access Token with permission to trigger
+              the VeilMarket evaluator workflow.
+            </p>
+          </div>
+          <button class="close" data-close="resolveModal">×</button>
+        </div>
+
+        <div class="field">
+          <label for="githubPat">GitHub Personal Access Token</label>
+          <input
+            id="githubPat"
+            type="password"
+            autocomplete="off"
+            placeholder="github_pat_…"
+          />
+        </div>
+
+        <p class="note">
+          Your PAT is sent only to the <code>/api/resolve</code> backend
+          endpoint and is not stored in this page.
+        </p>
+
+        <div class="actions">
+          <button class="ghost" data-close="resolveModal">Cancel</button>
+          <button class="primary" id="confirmResolveBtn">
+            Start Resolution
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script type="module">
@@ -688,6 +725,7 @@
       let provider = null;
       let signer = null;
       let contract = null;
+      let pendingResolveMarketId = null;
 
       const ZERO = "0x0000000000000000000000000000000000000000";
 
@@ -942,6 +980,18 @@
               ${passed ? "Market deadline passed." : "Prediction is open."}
             </span>
           </div>
+
+          ${
+            passed
+              ? `
+                <div class="actions">
+                  <button class="resolve" data-resolve="${market.id}">
+                    Resolve Market
+                  </button>
+                </div>
+              `
+              : ""
+          }
         </article>
       `;
             })
@@ -1068,6 +1118,67 @@
         }
       }
 
+      function openResolveModal(marketId) {
+        pendingResolveMarketId = String(marketId);
+        $("githubPat").value = "";
+        $("resolveModal").classList.add("open");
+        setTimeout(() => $("githubPat").focus(), 50);
+      }
+
+      async function triggerResolution() {
+        if (!pendingResolveMarketId) {
+          toast("No market selected.");
+          return;
+        }
+
+        const pat = $("githubPat").value.trim();
+
+        if (!pat) {
+          toast("Enter your GitHub PAT.");
+          return;
+        }
+
+        const button = $("confirmResolveBtn");
+        button.disabled = true;
+        button.textContent = "Starting…";
+
+        try {
+          const response = await fetch("/api/resolve", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              marketId: pendingResolveMarketId,
+              pat,
+            }),
+          });
+
+          const result = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+            throw new Error(result.error || "Failed to trigger GitHub Action.");
+          }
+
+          $("resolveModal").classList.remove("open");
+          $("githubPat").value = "";
+
+          toast(
+            `Resolution workflow started for Market #${pendingResolveMarketId}.`,
+          );
+
+          pendingResolveMarketId = null;
+
+          await loadMarkets();
+        } catch (error) {
+          console.error(error);
+          toast(`Resolve failed: ${error.message}`);
+        } finally {
+          button.disabled = false;
+          button.textContent = "Start Resolution";
+        }
+      }
+
       async function claim(marketId, button) {
         if (!contract || !signer) {
           toast("Connect your wallet first.");
@@ -1077,8 +1188,9 @@
         try {
           button.disabled = true;
           button.textContent = "Claiming…";
+          const url = `https://raw.githubusercontent.com/Pandey456/VeilMarket/main/veilmarket-tee/payouts/market-${marketId}.json?t=${Date.now()}`;
 
-          const url = `https://raw.githubusercontent.com/Pandey456/VeilMarket/main/payouts/market-${marketId}.json?t=${Date.now()}`;
+          //const url = `https://raw.githubusercontent.com/Pandey456/VeilMarket/main/payouts/market-${marketId}.json?t=${Date.now()}`;
 
           const response = await fetch(url);
 
@@ -1147,6 +1259,14 @@
 
         $("createMarketBtn").addEventListener("click", createMarket);
 
+        $("confirmResolveBtn").addEventListener("click", triggerResolution);
+
+        $("githubPat").addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            triggerResolution();
+          }
+        });
+
         for (const id of [
           "assetSelect",
           "directionSelect",
@@ -1166,6 +1286,13 @@
               predictButton.dataset.predict,
               predictButton.dataset.choice,
             );
+            return;
+          }
+
+          const resolveButton = event.target.closest("[data-resolve]");
+
+          if (resolveButton) {
+            openResolveModal(resolveButton.dataset.resolve);
             return;
           }
 
