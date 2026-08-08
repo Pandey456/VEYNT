@@ -14,6 +14,9 @@ const { StandardMerkleTree } = require("@openzeppelin/merkle-tree");
 
 const { VEIL_MARKET_ADDRESS, VEIL_MARKET_ABI } = require("./constants.js");
 
+const fs = require("fs");
+const path = require("path");
+
 // ============================================================
 // CONFIGURATION
 // ============================================================
@@ -413,6 +416,10 @@ function createPayoutMerkleTree(payouts) {
     throw new Error("Cannot create Merkle tree with zero winners.");
   }
 
+  // Each leaf represents:
+  //
+  // [bettor address, payout amount]
+  //
   const leaves = payouts.map((winner) => [
     winner.bettor,
     winner.payout.toString(),
@@ -420,12 +427,110 @@ function createPayoutMerkleTree(payouts) {
 
   const tree = StandardMerkleTree.of(leaves, ["address", "uint256"]);
 
+  // ----------------------------------------------------------
+  // Generate an individual Merkle proof for every winner
+  // ----------------------------------------------------------
+
+  const winnersWithProofs = payouts.map((winner, index) => {
+    const proof = tree.getProof(index);
+
+    return {
+      bettor: winner.bettor,
+
+      // Original stake
+      stake: winner.amount.toString(),
+
+      // Exact payout in wei
+      payout: winner.payout.toString(),
+
+      // Human-readable value for frontend
+      payoutFlr: Number(winner.payout) / 1e18,
+
+      // Merkle proof required by claimPayout()
+      proof,
+    };
+  });
+
   return {
     tree,
     merkleRoot: tree.root,
+    winnersWithProofs,
   };
 }
+// ============================================================
+// SAVE CLAIM DATA
+// ============================================================
+//
+// Creates:
+//
+// payouts/
+//   market-1.json
+//   market-2.json
+//   market-3.json
+//
+// The frontend can fetch these files and find the
+// connected wallet's payout automatically.
+//
+// ============================================================
 
+function saveClaimData({
+  market,
+  winningOutcome,
+  verifiedPrice,
+  targetPrice,
+  merkleRoot,
+  winnersWithProofs,
+  receipt,
+}) {
+  const payoutsDirectory = path.join(__dirname, "payouts");
+
+  // Create payouts directory if it doesn't exist
+  if (!fs.existsSync(payoutsDirectory)) {
+    fs.mkdirSync(payoutsDirectory, {
+      recursive: true,
+    });
+  }
+
+  const claimData = {
+    marketId: MARKET_ID.toString(),
+
+    contractAddress: VEIL_MARKET_ADDRESS,
+
+    question: market.question,
+
+    winningOutcome,
+
+    verifiedPrice: verifiedPrice.toString(),
+
+    targetPrice: targetPrice.toString(),
+
+    merkleRoot,
+
+    blockNumber: receipt.blockNumber.toString(),
+
+    transactionHash: receipt.transactionHash,
+
+    winners: winnersWithProofs.map((winner) => ({
+      bettor: winner.bettor,
+
+      stake: winner.stake,
+
+      payout: winner.payout,
+
+      payoutFlr: winner.payoutFlr,
+
+      proof: winner.proof,
+    })),
+  };
+
+  const filePath = path.join(payoutsDirectory, `market-${MARKET_ID}.json`);
+
+  fs.writeFileSync(filePath, JSON.stringify(claimData, null, 2));
+
+  console.log(`\nClaim data saved: ${filePath}`);
+
+  return filePath;
+}
 // ============================================================
 // SIGN RESOLUTION
 // ============================================================
@@ -631,9 +736,26 @@ async function runProductionEvaluator() {
 
   console.log("\nCreating Merkle tree...");
 
-  const { tree, merkleRoot } = createPayoutMerkleTree(payouts);
+  const { tree, merkleRoot, winnersWithProofs } =
+    createPayoutMerkleTree(payouts);
 
   console.log("Merkle Root:", merkleRoot);
+
+  console.log("\nGenerated claim proofs:");
+
+  for (const winner of winnersWithProofs) {
+    console.log("------------------------------------------");
+
+    console.log(`Winner: ${winner.bettor}`);
+
+    console.log(`Stake: ${winner.stake} wei`);
+
+    console.log(`Payout: ${winner.payout} wei`);
+
+    console.log(`Payout: ${winner.payoutFlr} FLR`);
+
+    console.log(`Proof: ${JSON.stringify(winner.proof)}`);
+  }
 
   // ==========================================================
   // SIGN WITH TEE
@@ -657,6 +779,21 @@ async function runProductionEvaluator() {
   // ==========================================================
 
   const receipt = await submitResolution(merkleRoot, winningOutcome, signature);
+  // ==========================================================
+  // SAVE CLAIM DATA
+  // ==========================================================
+
+  const claimFile = saveClaimData({
+    market,
+    winningOutcome,
+    verifiedPrice,
+    targetPrice,
+    merkleRoot,
+    winnersWithProofs,
+    receipt,
+  });
+
+  console.log(`Claim file: ${claimFile}`);
 
   // ==========================================================
   // SUCCESS
@@ -683,6 +820,14 @@ async function runProductionEvaluator() {
   console.log(`Block:           ${receipt.blockNumber}`);
 
   console.log(`TX Hash:         ${receipt.transactionHash}`);
+
+  console.log(`Claim File:      payouts/market-${MARKET_ID}.json`);
+
+  console.log("\nWinners:");
+
+  for (const winner of winnersWithProofs) {
+    console.log(`  ${winner.bettor} → ${winner.payoutFlr} FLR`);
+  }
 
   console.log("==========================================\n");
 }

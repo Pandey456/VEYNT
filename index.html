@@ -88,6 +88,51 @@
       <button id="finalizeBtn">Trigger TEE Finalize Workflow</button>
       <p id="finalizeStatus"></p>
     </div>
+    <!-- ================= CLAIM PAYOUT ================= -->
+    <div>
+      <h3>5. Claim Payout</h3>
+
+      <label>Market ID:</label><br />
+      <input type="number" id="claimMarketId" value="1" /><br />
+
+      <label>Payout Amount (FLR):</label><br />
+      <input type="number" id="claimPayout" placeholder="e.g. 17.2" /><br />
+
+      <label>Merkle Proof:</label><br />
+      <textarea
+        id="claimProof"
+        placeholder='["0x...", "0x..."]'
+        style="
+          width: 320px;
+          height: 80px;
+          background: #222;
+          color: #0f0;
+          border: 1px solid #0f0;
+        "
+      ></textarea>
+      <br />
+
+      <button id="claimBtn">Claim Payout</button>
+
+      <p id="claimStatus"></p>
+    </div>
+
+    <!-- ================= ADMIN ================= -->
+    <div>
+      <h3>6. Admin</h3>
+
+      <p>
+        Connected Owner:
+        <span id="contractOwner">Checking...</span>
+      </p>
+
+      <label>Treasury Withdrawal Address:</label><br />
+      <input type="text" id="withdrawAddress" placeholder="0x..." /><br />
+
+      <button id="withdrawTreasuryBtn">Withdraw Treasury</button>
+
+      <p id="adminStatus"></p>
+    </div>
     <script type="module">
       import {
         createWalletClient,
@@ -514,6 +559,52 @@
         { type: "error", name: "TransferFailed", inputs: [] },
         { type: "error", name: "ZeroAddress", inputs: [] },
         { type: "error", name: "ZeroStake", inputs: [] },
+
+        {
+          type: "function",
+          name: "owner",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [
+            {
+              type: "address",
+            },
+          ],
+        },
+
+        {
+          type: "function",
+          name: "claimPayout",
+          stateMutability: "nonpayable",
+          inputs: [
+            {
+              name: "_marketId",
+              type: "uint256",
+            },
+            {
+              name: "_payout",
+              type: "uint256",
+            },
+            {
+              name: "_merkleProof",
+              type: "bytes32[]",
+            },
+          ],
+          outputs: [],
+        },
+
+        {
+          type: "function",
+          name: "withdrawTreasury",
+          stateMutability: "nonpayable",
+          inputs: [
+            {
+              name: "to",
+              type: "address",
+            },
+          ],
+          outputs: [],
+        },
       ];
 
       let provider, signer, contract;
@@ -698,6 +789,158 @@
           } catch (err) {
             console.error(err);
             statusEl.innerText = "❌ Network error triggering workflow.";
+          }
+        });
+      // ============================================================
+      // CLAIM PAYOUT
+      // ============================================================
+
+      document
+        .getElementById("claimBtn")
+        .addEventListener("click", async () => {
+          if (!contract) {
+            return alert("Connect wallet first.");
+          }
+
+          const statusEl = document.getElementById("claimStatus");
+
+          try {
+            const marketId = BigInt(
+              document.getElementById("claimMarketId").value,
+            );
+
+            const payoutFlr = document.getElementById("claimPayout").value;
+
+            const proofInput = document
+              .getElementById("claimProof")
+              .value.trim();
+
+            if (!payoutFlr) {
+              throw new Error("Enter payout amount.");
+            }
+
+            if (!proofInput) {
+              throw new Error("Enter Merkle proof.");
+            }
+
+            let proof;
+
+            try {
+              proof = JSON.parse(proofInput);
+            } catch {
+              throw new Error(
+                'Invalid Merkle proof JSON. Example: ["0x...", "0x..."]',
+              );
+            }
+
+            const payoutWei = parseEther(payoutFlr);
+
+            statusEl.innerText = "Submitting claim transaction...";
+
+            const hash = await contract.write.claimPayout(
+              [marketId, payoutWei, proof],
+              {
+                account: signer.address,
+              },
+            );
+
+            statusEl.innerText = `Transaction submitted: ${hash}`;
+
+            const receipt = await provider.waitForTransactionReceipt({
+              hash,
+            });
+
+            if (receipt.status === "success") {
+              statusEl.innerText = `✅ Payout claimed successfully!\nTX: ${hash}`;
+            } else {
+              statusEl.innerText = "❌ Claim transaction failed.";
+            }
+          } catch (err) {
+            console.error(err);
+
+            statusEl.innerText = `❌ Claim failed: ${err.shortMessage || err.message}`;
+          }
+        });
+
+      // ============================================================
+      // ADMIN — CHECK OWNER
+      // ============================================================
+
+      async function checkAdmin() {
+        if (!contract) return;
+
+        try {
+          const owner = await contract.read.owner();
+
+          const ownerEl = document.getElementById("contractOwner");
+
+          ownerEl.innerText = owner;
+
+          if (owner.toLowerCase() !== signer.address.toLowerCase()) {
+            document.getElementById("withdrawTreasuryBtn").disabled = true;
+
+            document.getElementById("adminStatus").innerText =
+              "Connected wallet is not the contract owner.";
+          } else {
+            document.getElementById("adminStatus").innerText =
+              "✅ Connected wallet is contract owner.";
+          }
+        } catch (err) {
+          console.error("Failed to check owner:", err);
+        }
+      }
+
+      // ============================================================
+      // ADMIN — WITHDRAW TREASURY
+      // ============================================================
+
+      document
+        .getElementById("withdrawTreasuryBtn")
+        .addEventListener("click", async () => {
+          if (!contract) {
+            return alert("Connect wallet first.");
+          }
+
+          const statusEl = document.getElementById("adminStatus");
+
+          try {
+            const owner = await contract.read.owner();
+
+            if (owner.toLowerCase() !== signer.address.toLowerCase()) {
+              throw new Error(
+                "Only the contract owner can withdraw treasury funds.",
+              );
+            }
+
+            const to = document.getElementById("withdrawAddress").value.trim();
+
+            if (!to) {
+              throw new Error("Enter withdrawal address.");
+            }
+
+            statusEl.innerText = "Submitting treasury withdrawal...";
+
+            const hash = await contract.write.withdrawTreasury([to], {
+              account: signer.address,
+            });
+
+            statusEl.innerText = `Transaction submitted: ${hash}`;
+
+            const receipt = await provider.waitForTransactionReceipt({
+              hash,
+            });
+
+            if (receipt.status === "success") {
+              statusEl.innerText = `✅ Treasury withdrawn successfully!\nTX: ${hash}`;
+            } else {
+              statusEl.innerText = "❌ Treasury withdrawal failed.";
+            }
+          } catch (err) {
+            console.error(err);
+
+            statusEl.innerText = `❌ Withdrawal failed: ${
+              err.shortMessage || err.message
+            }`;
           }
         });
     </script>
