@@ -62,6 +62,7 @@ jobs:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           TEE_PRIVATE_KEY: ${{ secrets.TEE_PRIVATE_KEY }}
           VEIL_MARKET_ADDRESS: ${{ secrets.VEIL_MARKET_ADDRESS }}
+          PREDICTION_PRIVATE_KEY: ${{ secrets.PREDICTION_PRIVATE_KEY }}
           MARKET_ID: ${{ inputs.market_id }}
 
       - name: Publish Payout Data
