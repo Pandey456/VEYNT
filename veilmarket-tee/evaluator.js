@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const {
   createPublicClient,
   createWalletClient,
@@ -33,6 +34,11 @@ if (!process.env.PRIVATE_KEY) {
 
 if (!process.env.TEE_PRIVATE_KEY) {
   throw new Error("FATAL: TEE_PRIVATE_KEY environment variable is missing.");
+}
+if (!process.env.PREDICTION_PRIVATE_KEY) {
+  throw new Error(
+    "FATAL: PREDICTION_PRIVATE_KEY environment variable is missing.",
+  );
 }
 
 if (!VEIL_MARKET_ADDRESS) {
@@ -90,20 +96,37 @@ const walletClient = createWalletClient({
 
 function decryptPrediction(encodedPrediction) {
   if (!encodedPrediction || encodedPrediction === "0x") {
-    throw new Error("Empty prediction received.");
+    throw new Error("Empty encrypted prediction received.");
   }
 
-  const prediction = Buffer.from(encodedPrediction.slice(2), "hex").toString(
-    "utf8",
-  );
-
-  const normalizedPrediction = prediction.toUpperCase();
-
-  if (normalizedPrediction !== "YES" && normalizedPrediction !== "NO") {
-    throw new Error(`Invalid prediction after decryption: ${prediction}`);
+  if (!process.env.PREDICTION_PRIVATE_KEY) {
+    throw new Error("FATAL: PREDICTION_PRIVATE_KEY is missing.");
   }
 
-  return normalizedPrediction;
+  const privateKey = process.env.PREDICTION_PRIVATE_KEY.replace(/\\n/g, "\n");
+
+  try {
+    const encryptedData = Buffer.from(encodedPrediction.slice(2), "hex");
+
+    const decrypted = crypto.privateDecrypt(
+      {
+        key: privateKey,
+        padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
+        oaepHash: "sha256",
+      },
+      encryptedData,
+    );
+
+    const prediction = decrypted.toString("utf8").toUpperCase();
+
+    if (prediction !== "YES" && prediction !== "NO") {
+      throw new Error(`Invalid prediction after decryption: ${prediction}`);
+    }
+
+    return prediction;
+  } catch (error) {
+    throw new Error(`Prediction decryption failed: ${error.message}`);
+  }
 }
 
 // ============================================================

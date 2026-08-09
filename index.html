@@ -630,7 +630,6 @@
         custom,
         getContract,
         parseEther,
-        stringToHex,
         publicActions,
         defineChain,
         formatEther,
@@ -646,6 +645,16 @@
       });
 
       const CONTRACT_ADDRESS = "0x01D4D4a3F11E65888B453CE655B5b478D921E87f";
+      const PREDICTION_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArKeKZMf2oDUJWwLlrUDy
+5yB+sNQCqNGSkdbZ/ApoEHByzSj17ADH5lq07zvsDBQMMjThF68/1XqSubUSdWfG
+er14CH+U6VTPGxi0S4KkKuZxZkfctbKyazXYm9zYpcyEjOs/1miaOLTq+/fgBb3C
+eGi22aMzL1v9H1a6nyfZJyO5XFxbtDsl9IUPGyGbxjMvaf94cb9382OGx6gTpofc
+07/O+5XFMRGtBJaCA6BYKHx9YjE3+4g3CE5jIgGdHJf2H5CedCFNe2iuds4pDu8k
+qPaCMVfN7648xrThn93zW2HJ+LbkZMaxj9I1kqvVoI+LuL3dtfJxNd0wbITvkAsH
+twIDAQAB
+-----END PUBLIC KEY-----
+`;
 
       const ABI = [
         {
@@ -1079,6 +1088,49 @@
           toast(`Create failed: ${error.shortMessage || error.message}`);
         }
       }
+      async function encryptPrediction(prediction) {
+        const pem = PREDICTION_PUBLIC_KEY.replace(
+          "-----BEGIN PUBLIC KEY-----",
+          "",
+        )
+          .replace("-----END PUBLIC KEY-----", "")
+          .replace(/\s/g, "");
+
+        const binary = atob(pem);
+        const keyBytes = new Uint8Array(binary.length);
+
+        for (let i = 0; i < binary.length; i++) {
+          keyBytes[i] = binary.charCodeAt(i);
+        }
+
+        const publicKey = await crypto.subtle.importKey(
+          "spki",
+          keyBytes.buffer,
+          {
+            name: "RSA-OAEP",
+            hash: "SHA-256",
+          },
+          false,
+          ["encrypt"],
+        );
+
+        const plaintext = new TextEncoder().encode(prediction);
+
+        const encrypted = await crypto.subtle.encrypt(
+          {
+            name: "RSA-OAEP",
+          },
+          publicKey,
+          plaintext,
+        );
+
+        return (
+          "0x" +
+          Array.from(new Uint8Array(encrypted))
+            .map((byte) => byte.toString(16).padStart(2, "0"))
+            .join("")
+        );
+      }
 
       async function predict(marketId, choice) {
         if (!contract || !signer) {
@@ -1094,7 +1146,7 @@
           }
 
           const txHash = await contract.write.predict(
-            [BigInt(marketId), stringToHex(choice)],
+            [BigInt(marketId), await encryptPrediction(choice)],
             {
               value: parseEther(amount),
               account: signer.address,
