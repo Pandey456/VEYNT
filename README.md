@@ -1134,6 +1134,53 @@ Before a public production launch, the project should choose a more distinctive 
 - documentation
 
 ---
+# Future Scope
+
+The current prototype focuses on BTC price prediction markets. The next stage of development will expand the platform beyond a single asset and introduce additional utility for longer-duration markets.
+
+## 1. Expanded Assets and Real-World Markets
+
+The platform will be expanded to support prediction markets across a broader range of assets and real-world events.
+
+Planned categories include:
+
+- Additional cryptocurrencies and token price markets
+- Traditional financial assets
+- Sports and event-based outcomes
+- Other real-world scenarios that can be resolved using verifiable external data
+
+The goal is to make the market creation system flexible enough that a market can be created around any supported event or data source, rather than being limited to BTC price predictions.
+
+## 2. Yield Generation for Long-Duration Markets
+
+For markets with a deadline longer than 15 days, the capital accumulated in the market will have an additional use during the waiting period.
+
+Instead of leaving the prediction pool idle, the accumulated funds may be deployed into supported lending protocols to generate yield.
+
+The intended flow is:
+
+```text
+Users place predictions
+        ↓
+Market pool accumulates
+        ↓
+Deadline > 15 days
+        ↓
+Pool is deployed into supported lending protocols
+        ↓
+Yield is generated during the market duration
+        ↓
+Market reaches its deadline
+        ↓
+Market is resolved
+        ↓
+Principal is returned to the market
+        ↓
+Generated yield is distributed among
+the participants of that market
+
+```
+---
 
 # License
 
