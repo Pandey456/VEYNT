@@ -1,6 +1,6 @@
-# 🎭 VeilMarket
+# VeilMarket
 
-## Confidential Prediction Markets on Flare
+## Confidential prediction markets on Flare
 
 > **VeilMarket is a prototype confidential parimutuel prediction market built on Flare Coston2.**
 >
@@ -56,7 +56,7 @@ The end-to-end demo flow has been implemented and tested:
 
 ---
 
-# 🔒 The Problem
+# The Problem
 
 Traditional prediction markets expose a user's position publicly.
 
@@ -115,7 +115,7 @@ The specific goal is:
 
 ---
 
-# 🏗️ Architecture
+# Architecture
 
 VeilMarket currently combines four major components.
 
@@ -170,7 +170,7 @@ VeilMarket currently combines four major components.
 
 ---
 
-# 🔐 Confidential Prediction Flow
+# Confidential Prediction Flow
 
 ## 1. User chooses YES or NO
 
@@ -228,7 +228,7 @@ A block explorer can therefore see the ciphertext, but cannot simply UTF-8 decod
 
 ---
 
-# 🎯 Market Lifecycle
+# Market Lifecycle
 
 ## 1. Create Market
 
@@ -301,7 +301,7 @@ This avoids a user creating multiple prediction entries from the same wallet for
 
 ---
 
-# 🌐 FDC Resolution
+# FDC Resolution
 
 For the current crypto-price demo, Flare Data Connector's **Web2Json** attestation flow is used to retrieve Binance market data.
 
@@ -360,7 +360,7 @@ Result: YES
 
 ---
 
-# 🧠 Evaluation Engine
+# Evaluation Engine
 
 The evaluation engine lives in:
 
@@ -402,7 +402,7 @@ The evaluator performs the following sequence:
 
 ---
 
-# 🌳 Merkle-Based Payouts
+# Merkle-Based Payouts
 
 Instead of storing every user's payout directly in the contract, the evaluator creates a Merkle tree.
 
@@ -445,7 +445,9 @@ Example claim data:
   "marketId": 5,
   "bettor": "0x...",
   "payout": "12900000000000000000",
-  "proof": ["0x..."]
+  "proof": [
+    "0x..."
+  ]
 }
 ```
 
@@ -457,7 +459,7 @@ without storing every payout on-chain.
 
 ---
 
-# ✍️ TEE Authorization
+# TEE Authorization
 
 The Merkle root alone does **not** authorize a market resolution.
 
@@ -512,50 +514,64 @@ This prevents an arbitrary evaluator using a different private key from resolvin
 
 ---
 
-# 💰 Payout Model
+# Payout and Fee Distribution
 
-VeilMarket uses a **parimutuel pool**.
+VeilMarket uses a parimutuel pool model. Once a market is resolved, the total market pool is distributed according to the following fixed allocation:
 
-There is no AMM and no requirement to seed liquidity.
+| Allocation | Share | Recipient |
+|---|---:|---|
+| Winning bettors | 86% | Distributed proportionally among winning bettors |
+| Market creator | 10% | Creator of the market |
+| Platform | 3% | VeilMarket platform treasury |
+| Resolver | 1% | Account that submits the market resolution |
 
-Suppose:
-
-```text
-Total pool = 15 FLR
-
-YES pool = 8 FLR
-NO pool  = 7 FLR
-```
-
-If YES wins, the winning bettors receive payouts proportional to their stake.
-
-The current demo's winner payout allocation uses the configured protocol payout percentage.
-
-For example, with an 86% winner allocation:
+The full pool is therefore allocated as:
 
 ```text
-Distributable winner pool
-=
-Total pool × 86%
+86%  Winning bettors
+10%  Market creator
+ 3%  Platform
+ 1%  Resolver
+--------------------
+100% Total pool
 ```
 
-Then:
+### Example
+
+For a market with a total pool of 15 FLR:
 
 ```text
-User payout
-=
-User winning stake
-/
-Total winning stake
-×
-Distributable pool
+Winning bettors = 12.90 FLR
+Market creator  =  1.50 FLR
+Platform        =  0.45 FLR
+Resolver        =  0.15 FLR
+--------------------------------
+Total           = 15.00 FLR
 ```
 
-The exact percentages should be treated as contract configuration rather than assumed protocol economics while the project is in prototype stage.
+The 86% winning allocation is divided proportionally according to the stake of each winning bettor.
 
----
+For example, if the winning side contains:
 
-# 🏆 Claiming Winnings
+```text
+Winner A = 8 FLR
+Winner B = 2 FLR
+
+Winning pool = 10 FLR
+```
+
+then Winner A owns 80% of the winning pool and Winner B owns 20%.
+
+They therefore receive:
+
+```text
+Winner A → 80% of 12.90 FLR = 10.32 FLR
+Winner B → 20% of 12.90 FLR =  2.58 FLR
+```
+
+The market creator, platform, and resolver allocations are separate from the winning bettors' proportional allocation.
+
+# Claiming Winnings
 
 After the market is resolved:
 
@@ -591,7 +607,7 @@ The contract also prevents the same wallet from claiming the same market payout 
 
 ---
 
-# 🛡️ Emergency Refund
+# Emergency Refund
 
 If a market cannot be resolved, the contract provides an emergency refund path after the configured resolution grace period.
 
@@ -599,7 +615,7 @@ This is intended to prevent user funds from becoming permanently inaccessible be
 
 ---
 
-# ⚙️ Smart Contract API
+# Smart Contract API
 
 The main contract is:
 
@@ -609,30 +625,30 @@ VeilMarket.sol
 
 ### Write functions
 
-| Function                                         | Purpose                                                      |
-| ------------------------------------------------ | ------------------------------------------------------------ |
-| `createMarket(...)`                              | Creates a new prediction market                              |
-| `predict(uint256, bytes)`                        | Places a stake with an encrypted prediction                  |
-| `resolveMarket(uint256, bytes32, string, bytes)` | Stores the authorized outcome and Merkle root                |
-| `claimPayout(uint256, uint256, bytes32[])`       | Claims a verified winner payout                              |
-| `emergencyRefund(uint256)`                       | Reclaims stake after the emergency-refund conditions are met |
-| `withdrawTreasury(address)`                      | Owner treasury withdrawal                                    |
-| `transferOwnership(address)`                     | Transfers contract ownership                                 |
+| Function | Purpose |
+|---|---|
+| `createMarket(...)` | Creates a new prediction market |
+| `predict(uint256, bytes)` | Places a stake with an encrypted prediction |
+| `resolveMarket(uint256, bytes32, string, bytes)` | Stores the authorized outcome and Merkle root |
+| `claimPayout(uint256, uint256, bytes32[])` | Claims a verified winner payout |
+| `emergencyRefund(uint256)` | Reclaims stake after the emergency-refund conditions are met |
+| `withdrawTreasury(address)` | Owner treasury withdrawal |
+| `transferOwnership(address)` | Transfers contract ownership |
 
 ### Important view functions
 
-| Function                         | Purpose                                  |
-| -------------------------------- | ---------------------------------------- |
-| `markets(uint256)`               | Returns market information               |
-| `stakeOf(uint256,address)`       | Returns a user's stake                   |
-| `getPrediction(uint256,address)` | Returns the user's encrypted prediction  |
-| `getBettors(uint256)`            | Returns bettors associated with a market |
-| `marketCount()`                  | Returns the number of markets            |
-| `getRequiredFee()`               | Returns the current market-creation fee  |
+| Function | Purpose |
+|---|---|
+| `markets(uint256)` | Returns market information |
+| `stakeOf(uint256,address)` | Returns a user's stake |
+| `getPrediction(uint256,address)` | Returns the user's encrypted prediction |
+| `getBettors(uint256)` | Returns bettors associated with a market |
+| `marketCount()` | Returns the number of markets |
+| `getRequiredFee()` | Returns the current market-creation fee |
 
 ---
 
-# 🔑 Key Management
+# Key Management
 
 There are two different cryptographic key purposes.
 
@@ -671,7 +687,7 @@ For the demo, both secrets are injected into GitHub Actions as repository secret
 
 ---
 
-# 🤖 GitHub Actions Resolution
+# GitHub Actions Resolution
 
 The demo uses a manually triggered GitHub workflow:
 
@@ -712,7 +728,7 @@ The frontend can then retrieve the payout data and construct the claim transacti
 
 ---
 
-# 🖥️ Frontend
+# Frontend
 
 The current demo frontend is a lightweight HTML/JavaScript application.
 
@@ -746,7 +762,7 @@ Those are evaluation/settlement concerns rather than user-facing market configur
 
 ---
 
-# 🧪 Current Demo Example
+# Current Demo Example
 
 A typical market can be created as:
 
@@ -798,7 +814,7 @@ Winner claims payout
 
 ---
 
-# 📂 Repository Structure
+# Repository Structure
 
 ```text
 VeilMarket/
@@ -833,7 +849,7 @@ VeilMarket/
 
 ---
 
-# 🛠️ Development Setup
+# Development Setup
 
 ## Prerequisites
 
@@ -887,7 +903,7 @@ forge test -vvv
 
 ---
 
-# 🌐 Flare Coston2
+# Flare Coston2
 
 The current demo runs on:
 
@@ -906,7 +922,7 @@ The project is intentionally deployed to testnet while the architecture is being
 
 ---
 
-# 🔍 Transparency vs Confidentiality
+# Transparency vs Confidentiality
 
 VeilMarket does not attempt to hide everything.
 
@@ -940,7 +956,7 @@ It is:
 
 ---
 
-# ⚠️ Security Considerations
+# Security Considerations
 
 ### Prediction encryption
 
@@ -986,7 +1002,7 @@ The contract has not been independently audited.
 
 ---
 
-# 🚧 Known Prototype Limitations
+# Known Prototype Limitations
 
 1. **GitHub Actions is currently the evaluator execution layer.**
 2. **The TEE architecture is represented by a trusted signing/decryption key boundary; a production hardware-enclave deployment is still a future step.**
@@ -999,7 +1015,7 @@ The contract has not been independently audited.
 
 ---
 
-# 🗺️ Roadmap
+# Roadmap
 
 ## Phase 1 — Core Market
 
@@ -1054,7 +1070,7 @@ The contract has not been independently audited.
 
 ---
 
-# 🧠 Design Principles
+# Design Principles
 
 ### 1. Hide the decision, not the transaction
 
@@ -1080,7 +1096,7 @@ Private decryption/signing keys stay in the evaluator environment.
 
 ---
 
-# 📣 Build in Public
+# Build in Public
 
 VeilMarket is being developed publicly.
 
@@ -1092,7 +1108,7 @@ The goal is to document the process of taking a confidential prediction-market i
 
 ---
 
-# 🏷️ About the Name
+# About the Name
 
 The project currently uses **VeilMarket** because that is the repository and deployed prototype name.
 
@@ -1119,7 +1135,7 @@ Before a public production launch, the project should choose a more distinctive 
 
 ---
 
-# 📄 License
+# License
 
 Licensed under the MIT License.
 
