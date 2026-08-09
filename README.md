@@ -1,264 +1,1134 @@
 # 🎭 VeilMarket
 
-**The First Confidential Parimutuel Prediction Market on Flare Network.**
+## Confidential Prediction Markets on Flare
 
-> _Predict outcomes on sports, crypto, and real-world events with zero herding bias or public position exposure — powered by Flare Confidential Compute (TEEs) and settled trustlessly via the Flare Data Connector (FDC)._
+> **VeilMarket is a prototype confidential parimutuel prediction market built on Flare Coston2.**
+>
+> Users submit encrypted YES/NO predictions, while stake amounts and wallet addresses remain publicly visible on-chain. Markets are resolved using real-world data retrieved through Flare Data Connector (FDC), with an evaluator producing the final outcome, payout allocation, Merkle tree, and TEE-authorized resolution.
+
+**Live demo:** https://veilmarket.adarshpandey.xyz  
+**Repository:** https://github.com/Pandey456/VeilMarket  
+**Build in public:** https://x.com/pandeyy456
 
 <p align="center">
   <img alt="Solidity" src="https://img.shields.io/badge/Solidity-0.8.20-363636?logo=solidity" />
   <img alt="Foundry" src="https://img.shields.io/badge/Built%20with-Foundry-black" />
   <img alt="Flare" src="https://img.shields.io/badge/Network-Flare%20Coston2-e62058" />
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-20-339933?logo=node.js" />
   <img alt="License" src="https://img.shields.io/badge/License-MIT-blue" />
 </p>
 
 ---
 
-## 📖 The Problem: Polymarket Is Broken by Transparency
+## ⚠️ Demo Status
 
-Traditional on-chain prediction markets (like Polymarket) suffer from **herding bias** and **front-running**. When a whale publicly places a $50,000 bet on "YES", other users copy the trade, and market sentiment shifts before the underlying question is even close to resolving.
+VeilMarket is currently a **working Coston2 testnet prototype**, not a production prediction market.
 
-**VeilMarket fixes this.** By moving prediction *selections* off-chain into a hardware enclave, bets stay 100% confidential until the market resolves. No one can see which side holds the most money, so users bet on their true convictions instead of following the crowd.
+The end-to-end demo flow has been implemented and tested:
 
-> Note on what is and isn't private: your **choice** (YES/NO) is encrypted. Your **stake amount and wallet address are inherently public** — `msg.value` and `msg.sender` always are on any EVM chain. VeilMarket hides the one thing that causes herding: the direction of the bet.
+- [x] Create markets from the frontend
+- [x] Create markets with FTSO-derived FLR/USD fee calculation
+- [x] Place YES/NO predictions
+- [x] Restrict each wallet to one prediction per market
+- [x] Encrypt prediction choices client-side
+- [x] Store encrypted predictions on-chain
+- [x] Retrieve the encrypted bettor list during evaluation
+- [x] Resolve crypto-price markets using FDC Web2Json
+- [x] Determine the winning side from the verified price
+- [x] Calculate proportional payouts
+- [x] Build a Merkle tree for winning bettors
+- [x] Generate individual Merkle proofs
+- [x] Sign the resolution payload with the configured TEE signing key
+- [x] Verify the TEE signature on-chain
+- [x] Store the Merkle root on-chain
+- [x] Generate claim data for winners
+- [x] Publish payout JSON through GitHub Actions
+- [x] Allow winners to claim using a Merkle proof
+- [x] Provide an emergency refund path for unresolved markets
 
----
+### What is not production-ready
 
-## 🚀 The Flare "Trifecta" Architecture
-
-VeilMarket leverages three enshrined Flare protocols to build a fully decentralized, serverless dApp:
-
-### 1. Flare Confidential Compute (FCC / TEEs) — _The Privacy Shield_
-- User choices are encrypted client-side with the TEE's public key and submitted as an **opaque byte string**.
-- The ciphertext is emitted in the `BetPlaced` event (on-chain data), so the enclave can read every bet without paying storage costs.
-- Only the hardware TEE enclave can decrypt bets off-chain to compute the winning pool — **zero on-chain choice leakage**.
-
-### 2. Flare Data Connector (FDC) — _The Trustless Truth_
-- No centralized oracle, no human dispute resolution.
-- Uses FDC's `Web2Json` attestation to trustlessly query real-world REST APIs (sports scores, crypto prices, election results) and bring a verifiable cryptographic proof on-chain.
-
-### 3. Flare Time Series Oracle (FTSOv2) — _The Anti-Spam Gatekeeper_
-- Anyone can create a market permissionlessly.
-- To prevent spam, market creation costs a flat **$13 USD**. The contract queries the live `FLR/USD` feed and calculates the exact `wei` required at that block. Overpayment is refunded automatically.
-
----
-
-## 🧮 Parimutuel Tokenomics (No AMM Required)
-
-VeilMarket uses a **parimutuel pool model** — no liquidity seeding, no bonding curves. All staked collateral is pooled into a single escrow. When the market resolves, the **losing pool** is distributed to the **winning pool** proportionally, minus protocol fees.
-
-**The Golden Ratio Resolution (100% on-chain execution):**
-
-| Share | Recipient       | Purpose                                                              |
-|-------|-----------------|----------------------------------------------------------------------|
-| 86%   | Winning bettors | Distributed proportionally by stake weight within the winning pool.  |
-| 10%   | Market creator  | Rewards users for posting high-quality, engaging markets.            |
-| 3%    | Platform treasury | Self-funds the protocol (domains, future audits).                  |
-| 1%    | The finalizer   | Keeper bounty for whoever pays gas to call `finalize()` after expiry. |
-
-The contract is **serverless**: any user or MEV bot can trigger settlement and earns the 1% bounty.
+- The evaluator currently runs through GitHub Actions for the public demo.
+- The signing key and prediction-decryption key are supplied to the evaluator through GitHub Actions secrets.
+- The current implementation should **not** be treated as a production-grade hardware TEE deployment.
+- The system has not been independently audited.
+- The current demo is intended to demonstrate the architecture and end-to-end mechanics on Coston2.
 
 ---
 
-## ⚙️ How It Works (Technical Sequence)
+# 🔒 The Problem
 
-### 1. Market Creation — `createMarket`
-Connect wallet, define a question, specify the FDC resolution endpoint, and set a `deadline`. The contract pulls the live FTSOv2 price, charges $13 in FLR (refunding any excess), and opens the market.
+Traditional prediction markets expose a user's position publicly.
 
-### 2. Confidential Betting — `predict`
-Users lock FLR collateral in escrow. Their prediction is encrypted with the TEE public key and emitted as an opaque blob. Block-explorer observers see only that a deposit was made — not the chosen outcome.
+If a user sees:
 
-### 3. Permissionless Settlement — `finalize` _(in progress)_
-Once `block.timestamp >= deadline`, the market locks and the settlement handshake runs:
-1. The FDC fetches the real-world answer via API and brings the `Web2Json` proof on-chain.
-2. The TEE enclave reads the FDC truth and all encrypted bets from the chain.
-3. The TEE decrypts bets, matches them against the truth, and computes payouts.
-4. The TEE signs `keccak256(marketId, winningOption, payoutAmounts)`.
-5. The contract validates the signature via `ecrecover` and distributes funds.
-
-### 4. Safety Valve — `emergencyRefund`
-If FDC/TEE settlement never happens, funds are **not** bricked. After `deadline + 3 days` with no resolution, any bettor can reclaim their exact stake.
-
----
-
-## 📚 Contract API Reference
-
-### Write Functions
-
-| Function | Access | Description |
-|----------|--------|-------------|
-| `createMarket(string question, uint256 deadline, string apiEndpoint)` | public, payable | Opens a market. Charges the FTSOv2 $13 fee, refunds excess. Returns `marketId`. |
-| `predict(uint256 marketId, bytes encryptedChoice)` | public, payable | Stakes FLR and records a confidential bet. |
-| `finalize(uint256 marketId, bytes fdcProof, bytes teeSignedPayload)` | public | Resolves a market and distributes payouts. **Currently a stub — reverts `NotImplemented`.** |
-| `emergencyRefund(uint256 marketId)` | public | Reclaims your stake if the market is unresolved past the grace period. |
-| `withdrawTreasury(address to)` | onlyOwner | Withdraws accumulated creation fees. |
-| `transferOwnership(address newOwner)` | onlyOwner | Transfers admin rights. |
-
-### View Functions
-
-| Function | Description |
-|----------|-------------|
-| `getRequiredFee() → uint256` | Live FLR (wei) needed to pay the $13 fee. Quote this in your frontend, send a small buffer, and let `createMarket` refund the excess. |
-| `markets(uint256) → Market` | Reads a market struct. |
-| `stakeOf(uint256, address) → uint256` | A bettor's total stake in a market. |
-| `marketCount() → uint256` | Number of markets created. |
-| `accumulatedTreasuryFees() → uint256` | Withdrawable treasury balance. |
-
-### Constants
-
-| Constant | Value | Meaning |
-|----------|-------|---------|
-| `TARGET_USD_FEE` | `13 ether` | $13, expressed with 18 decimals. |
-| `MIN_MARKET_DURATION` | `5 minutes` | Minimum time a market must stay open. |
-| `MAX_PRICE_AGE` | `1 hour` | Reject the oracle price if older than this. |
-| `RESOLUTION_GRACE` | `3 days` | Refund window after an unresolved deadline. |
-
-### Events
-`MarketCreated`, `BetPlaced`, `EmergencyRefunded`, `TreasuryWithdrawn`, `OwnershipTransferred`.
-
-### Custom Errors
-Gas-efficient reverts instead of string messages: `NotOwner`, `ZeroAddress`, `DeadlineInPast`, `DurationTooShort`, `EmptyQuestion`, `EmptyEndpoint`, `InvalidOraclePrice`, `NegativeDecimals`, `StalePrice`, `InsufficientFee`, `RefundFailed`, `MarketNotFound`, `MarketClosed`, `ZeroStake`, `AlreadyResolved`, `GracePeriodNotPassed`, `NothingToWithdraw`, `TransferFailed`, `Reentrancy`, `NotImplemented`.
-
----
-
-## 🔐 The Fee Math (Why It's Correct)
-
-FTSOv2's `getFeedById` returns `value` and `decimals` such that:
-
-```
-price(USD) = value / 10^decimals
+```text
+Alice → YES → 100 FLR
+Bob   → YES → 500 FLR
+Charlie → NO → 2 FLR
 ```
 
-To convert the $13 target into FLR wei:
+they can infer market sentiment and potentially follow large positions.
 
-```
-requiredWei = 13e18 / price
-            = 13e18 / (value / 10^decimals)
-            = 13e18 * 10^decimals / value
+This creates:
+
+- herding bias
+- copy trading
+- information leakage
+- strategic behavior based on other users' positions
+
+VeilMarket attempts to hide the **prediction direction** while keeping the settlement verifiable.
+
+### What is private?
+
+The prediction:
+
+```text
+YES
 ```
 
-**Worked example** — FLR = $0.02, `decimals = 7`, `value = 200000`:
+or:
 
-```
-requiredWei = 13e18 * 1e7 / 2e5 = 650e18 wei = 650 FLR
-650 FLR * $0.02 = $13 ✅
+```text
+NO
 ```
 
-The contract guards against a negative `decimals`, a zero price, and a stale timestamp before doing this division.
+is encrypted before it reaches the blockchain.
+
+### What remains public?
+
+The following are inherently visible on an EVM chain:
+
+- wallet address
+- transaction
+- stake amount
+- market ID
+- encrypted prediction ciphertext
+- transaction timestamp
+- contract address
+
+VeilMarket therefore does **not** claim that the entire bet is private.
+
+The specific goal is:
+
+> **Hide the prediction direction until the market resolves.**
 
 ---
 
-## 🗺️ Development Roadmap & Phase Tracker
+# 🏗️ Architecture
 
-**Phase 1: Foundation & Smart Contracts (Core Escrow)**
-- [x] Design parimutuel pool model & fee distribution (86/10/3/1).
-- [x] Implement FTSOv2 integration for dynamic `$13` creation fees.
-- [x] Write core `VeilMarket.sol` struct and escrow logic.
-- [x] Add `predict` (confidential betting) and `emergencyRefund` safety valve.
-- [x] Add owner + treasury withdrawal, custom errors, reentrancy guard.
-- [ ] Setup Foundry test environment & mock oracles.
+VeilMarket currently combines four major components.
 
-**Phase 2: The Trustless Truth (FDC Integration)**
-- [ ] Integrate Flare Data Connector (FDC) for automated settlement.
-- [ ] Configure `Web2Json` attestation types for external REST APIs.
-- [ ] Implement `finalize()` logic to parse FDC cryptographic proofs.
-
-**Phase 3: The Privacy Layer (Confidential Compute / TEE)**
-- [ ] Develop Rust-based TEE enclave for off-chain decryption.
-- [ ] Setup client-side encryption using the TEE public key.
-- [ ] Implement TEE ECDSA signature verification (`ecrecover`) on-chain.
-
-**Phase 4: UI/UX & Coston2 Deployment**
-- [ ] Deploy VeilMarket contracts to Flare Coston2 Testnet.
-- [ ] Build Next.js frontend for market creation and prediction.
-- [ ] End-to-end integration testing.
-- [ ] Submit to Flare Summer Signal Hackathon.
+```text
+                    ┌─────────────────────────┐
+                    │       Frontend           │
+                    │  veilmarket.adarsh...   │
+                    └────────────┬────────────┘
+                                 │
+                     Encrypt YES / NO
+                                 │
+                                 ▼
+                    ┌─────────────────────────┐
+                    │   VeilMarket Contract   │
+                    │      Flare Coston2      │
+                    └──────┬─────────┬────────┘
+                           │         │
+                  encrypted bets     │
+                           │         │
+                           ▼         ▼
+                    ┌──────────┐  ┌──────────┐
+                    │Evaluator │  │  FDC     │
+                    │GitHub    │  │Web2Json  │
+                    │Actions   │  │          │
+                    └────┬─────┘  └────┬─────┘
+                         │             │
+                         │ decrypt     │ verified
+                         │ predictions│ response
+                         └──────┬──────┘
+                                │
+                         determine winner
+                                │
+                         calculate payouts
+                                │
+                         Merkle tree
+                                │
+                         TEE signature
+                                │
+                                ▼
+                    ┌─────────────────────────┐
+                    │    resolveMarket()      │
+                    │   Signature verified    │
+                    │   Merkle root stored    │
+                    └────────────┬────────────┘
+                                 │
+                                 ▼
+                         ┌───────────────┐
+                         │ claimPayout() │
+                         │ Merkle proof  │
+                         └───────────────┘
+```
 
 ---
 
-## 📂 Repository Architecture
+# 🔐 Confidential Prediction Flow
+
+## 1. User chooses YES or NO
+
+The frontend never sends plaintext:
+
+```text
+YES
+```
+
+or:
+
+```text
+NO
+```
+
+to the contract.
+
+Instead, the choice is encrypted client-side.
+
+The current prototype uses:
+
+**RSA-OAEP with SHA-256**
+
+The public encryption key is safe to expose in the frontend.
+
+The corresponding private decryption key is kept outside the frontend and supplied to the evaluator as:
+
+```text
+PREDICTION_PRIVATE_KEY
+```
+
+### Encryption flow
+
+```text
+User choice
+    │
+    ▼
+"YES"
+    │
+    ▼
+RSA-OAEP(SHA-256)
+    │
+    │ public key
+    ▼
+256-byte ciphertext
+    │
+    ▼
+predict(marketId, encryptedChoice)
+    │
+    ▼
+Flare Coston2
+```
+
+A block explorer can therefore see the ciphertext, but cannot simply UTF-8 decode it back to `YES` or `NO`.
+
+---
+
+# 🎯 Market Lifecycle
+
+## 1. Create Market
+
+A user connects a wallet and creates a market.
+
+The frontend presents the question in a structured form such as:
+
+```text
+Will the price of BTC be above $65,000 after 5 minutes?
+```
+
+Internally the evaluator uses a normalized representation:
+
+```text
+BTC|ABOVE|6500000000000
+```
+
+The price uses 8 decimal places:
+
+```text
+65000 USD
+→
+6500000000000
+```
+
+The deadline is stored as a Unix timestamp.
+
+The market also stores the API endpoint used by the evaluator/FDC request.
+
+---
+
+## 2. Place Prediction
+
+A user enters a stake and chooses:
+
+```text
+YES
+```
+
+or:
+
+```text
+NO
+```
+
+The frontend encrypts the choice and calls:
+
+```solidity
+predict(
+    uint256 marketId,
+    bytes encryptedChoice
+)
+```
+
+The contract:
+
+1. verifies the market exists
+2. verifies the market has not expired
+3. requires a non-zero stake
+4. records the user's stake
+5. emits the encrypted prediction
+
+The prediction itself is not stored as plaintext.
+
+### One prediction per wallet
+
+The current demo treats one wallet as one predictor per market.
+
+This avoids a user creating multiple prediction entries from the same wallet for the same market.
+
+---
+
+# 🌐 FDC Resolution
+
+For the current crypto-price demo, Flare Data Connector's **Web2Json** attestation flow is used to retrieve Binance market data.
+
+Example endpoint:
+
+```text
+https://data-api.binance.vision/api/v3/klines
+```
+
+The evaluator constructs an FDC request using:
+
+```text
+symbol = BTCUSDT
+interval = 1m
+startTime = market deadline
+limit = 1
+```
+
+The response is post-processed into an integer price with 8 decimal places.
+
+Example:
+
+```text
+$64,540
+```
+
+becomes:
+
+```text
+6454000000000
+```
+
+The evaluator then compares the verified price with the market target.
+
+Example:
+
+```text
+Target:  $65,000
+Actual:  $65,122
+
+Condition: ABOVE
+
+Result: YES
+```
+
+For a `BELOW` market:
+
+```text
+Target:  $65,000
+Actual:  $64,500
+
+Condition: BELOW
+
+Result: YES
+```
+
+---
+
+# 🧠 Evaluation Engine
+
+The evaluation engine lives in:
+
+```text
+veilmarket-tee/evaluator.js
+```
+
+For the current demo it is executed through GitHub Actions.
+
+The evaluator performs the following sequence:
+
+```text
+1. Read market from contract
+        ↓
+2. Parse question
+        ↓
+3. Request FDC/Web2Json data
+        ↓
+4. Determine winning side
+        ↓
+5. Fetch bettors/predictions
+        ↓
+6. Decrypt YES/NO predictions
+        ↓
+7. Split bettors into winning/losing pools
+        ↓
+8. Calculate proportional payouts
+        ↓
+9. Create Merkle tree
+        ↓
+10. Generate winner proofs
+        ↓
+11. Sign marketId + MerkleRoot + outcome
+        ↓
+12. Call resolveMarket()
+        ↓
+13. Save payout data
+```
+
+---
+
+# 🌳 Merkle-Based Payouts
+
+Instead of storing every user's payout directly in the contract, the evaluator creates a Merkle tree.
+
+Each winner becomes a leaf containing:
+
+```text
+wallet address
++
+payout amount
+```
+
+Conceptually:
+
+```text
+Leaf =
+hash(walletAddress, payout)
+```
+
+The tree produces:
+
+```text
+Merkle Root
+```
+
+Only the root is stored in the market contract.
+
+Example:
+
+```text
+Merkle Root:
+0x130905010a119e10127872011800327ba448494e1d0aba13fee2044e1f320cc7
+```
+
+The evaluator also generates an individual proof for each winner.
+
+Example claim data:
+
+```json
+{
+  "marketId": 5,
+  "bettor": "0x...",
+  "payout": "12900000000000000000",
+  "proof": ["0x..."]
+}
+```
+
+This allows the contract to verify:
+
+> "This wallet + this payout is part of the Merkle tree authorized for this market."
+
+without storing every payout on-chain.
+
+---
+
+# ✍️ TEE Authorization
+
+The Merkle root alone does **not** authorize a market resolution.
+
+The evaluator creates:
+
+```text
+keccak256(
+    marketId,
+    merkleRoot,
+    winningOutcome
+)
+```
+
+The configured TEE signing account signs that hash.
+
+The contract recovers the signer and compares it with the trusted TEE signer configured in the contract.
+
+Conceptually:
+
+```text
+Evaluator
+    │
+    ├── marketId
+    ├── merkleRoot
+    └── winningOutcome
+            │
+            ▼
+       message hash
+            │
+            ▼
+      TEE private key
+            │
+            ▼
+        signature
+            │
+            ▼
+      resolveMarket()
+            │
+            ▼
+    recover signer
+            │
+            ▼
+       trusted TEE?
+       /          \
+     YES           NO
+      │             │
+      ▼             ▼
+ resolve         revert
+```
+
+This prevents an arbitrary evaluator using a different private key from resolving the market.
+
+---
+
+# 💰 Payout Model
+
+VeilMarket uses a **parimutuel pool**.
+
+There is no AMM and no requirement to seed liquidity.
+
+Suppose:
+
+```text
+Total pool = 15 FLR
+
+YES pool = 8 FLR
+NO pool  = 7 FLR
+```
+
+If YES wins, the winning bettors receive payouts proportional to their stake.
+
+The current demo's winner payout allocation uses the configured protocol payout percentage.
+
+For example, with an 86% winner allocation:
+
+```text
+Distributable winner pool
+=
+Total pool × 86%
+```
+
+Then:
+
+```text
+User payout
+=
+User winning stake
+/
+Total winning stake
+×
+Distributable pool
+```
+
+The exact percentages should be treated as contract configuration rather than assumed protocol economics while the project is in prototype stage.
+
+---
+
+# 🏆 Claiming Winnings
+
+After the market is resolved:
+
+```text
+Market
+  ↓
+Merkle root stored on-chain
+  ↓
+Evaluator generates payout JSON
+  ↓
+Payout JSON published to repository
+  ↓
+Frontend retrieves user's claim data
+  ↓
+User clicks Claim
+  ↓
+claimPayout()
+```
+
+The contract reconstructs the leaf from:
+
+```text
+msg.sender
++
+payout
+```
+
+and verifies the supplied Merkle proof against the stored root.
+
+A valid proof is required before the payout is released.
+
+The contract also prevents the same wallet from claiming the same market payout twice.
+
+---
+
+# 🛡️ Emergency Refund
+
+If a market cannot be resolved, the contract provides an emergency refund path after the configured resolution grace period.
+
+This is intended to prevent user funds from becoming permanently inaccessible because the external evaluation pipeline stopped functioning.
+
+---
+
+# ⚙️ Smart Contract API
+
+The main contract is:
+
+```text
+VeilMarket.sol
+```
+
+### Write functions
+
+| Function                                         | Purpose                                                      |
+| ------------------------------------------------ | ------------------------------------------------------------ |
+| `createMarket(...)`                              | Creates a new prediction market                              |
+| `predict(uint256, bytes)`                        | Places a stake with an encrypted prediction                  |
+| `resolveMarket(uint256, bytes32, string, bytes)` | Stores the authorized outcome and Merkle root                |
+| `claimPayout(uint256, uint256, bytes32[])`       | Claims a verified winner payout                              |
+| `emergencyRefund(uint256)`                       | Reclaims stake after the emergency-refund conditions are met |
+| `withdrawTreasury(address)`                      | Owner treasury withdrawal                                    |
+| `transferOwnership(address)`                     | Transfers contract ownership                                 |
+
+### Important view functions
+
+| Function                         | Purpose                                  |
+| -------------------------------- | ---------------------------------------- |
+| `markets(uint256)`               | Returns market information               |
+| `stakeOf(uint256,address)`       | Returns a user's stake                   |
+| `getPrediction(uint256,address)` | Returns the user's encrypted prediction  |
+| `getBettors(uint256)`            | Returns bettors associated with a market |
+| `marketCount()`                  | Returns the number of markets            |
+| `getRequiredFee()`               | Returns the current market-creation fee  |
+
+---
+
+# 🔑 Key Management
+
+There are two different cryptographic key purposes.
+
+## TEE signing key
+
+```text
+TEE_PRIVATE_KEY
+```
+
+Used to:
+
+```text
+sign marketId + MerkleRoot + outcome
+```
+
+The corresponding Ethereum address must match the trusted TEE signer configured in the deployed contract.
+
+## Prediction decryption key
+
+```text
+PREDICTION_PRIVATE_KEY
+```
+
+Used to decrypt RSA-OAEP encrypted YES/NO predictions.
+
+This key must **never** be exposed in:
+
+- frontend JavaScript
+- `index.html`
+- browser storage
+- public GitHub files
+- transaction calldata
+- logs
+
+For the demo, both secrets are injected into GitHub Actions as repository secrets.
+
+---
+
+# 🤖 GitHub Actions Resolution
+
+The demo uses a manually triggered GitHub workflow:
+
+```text
+.github/workflows/fdc-full-run.yml
+```
+
+The workflow accepts:
+
+```text
+market_id
+```
+
+and runs:
+
+```bash
+node veilmarket-tee/evaluator.js
+```
+
+The required secrets include:
+
+```text
+PRIVATE_KEY
+TEE_PRIVATE_KEY
+PREDICTION_PRIVATE_KEY
+VEIL_MARKET_ADDRESS
+```
+
+After evaluation, the workflow publishes:
+
+```text
+veilmarket-tee/payouts/market-X.json
+```
+
+back to the repository.
+
+The frontend can then retrieve the payout data and construct the claim transaction.
+
+---
+
+# 🖥️ Frontend
+
+The current demo frontend is a lightweight HTML/JavaScript application.
+
+Live:
+
+https://veilmarket.adarshpandey.xyz
+
+The interface provides:
+
+- wallet connection
+- market cards
+- market creation
+- BTC price market creation
+- YES/NO prediction
+- stake input
+- deadline countdown
+- resolution controls
+- claim controls
+- transaction status
+- wallet-aware payout claiming
+
+The frontend deliberately hides evaluator infrastructure such as:
+
+- FDC request construction
+- API endpoint configuration
+- TEE signing
+- GitHub workflow internals
+- Merkle tree generation
+
+Those are evaluation/settlement concerns rather than user-facing market configuration.
+
+---
+
+# 🧪 Current Demo Example
+
+A typical market can be created as:
+
+```text
+Will the price of BTC be above $65,000 after 5 minutes?
+```
+
+Internally:
+
+```text
+BTC|ABOVE|6500000000000
+```
+
+Users may then submit:
+
+```text
+YES
+```
+
+or:
+
+```text
+NO
+```
+
+with a FLR stake.
+
+At expiry:
+
+```text
+FDC → BTC price
+       ↓
+Evaluator → winning side
+       ↓
+Decrypt predictions
+       ↓
+Calculate winning pool
+       ↓
+Calculate payouts
+       ↓
+Merkle tree
+       ↓
+TEE signature
+       ↓
+resolveMarket()
+       ↓
+Winner claims payout
+```
+
+---
+
+# 📂 Repository Structure
 
 ```text
 VeilMarket/
-├── contracts/                  # Solidity Smart Contracts
-│   ├── VeilMarket.sol          # Main parimutuel logic & escrow
-│   ├── interfaces/             # Flare FDC/FTSO/TEE interfaces
-│   └── mocks/                  # Mock oracles for local testing
-├── enclave/                    # TEE Confidential Compute logic
-│   ├── src/main.rs             # Rust-based TEE decryption & payout calc
-│   └── Dockerfile              # Reproducible SGX enclave build
-├── script/                     # Foundry deployment scripts
+│
+├── contracts/
+│   └── VeilMarket.sol
+│
+├── script/
 │   └── DeployVeilMarket.s.sol
-├── test/                       # Foundry unit & integration tests
+│
+├── test/
 │   └── VeilMarket.t.sol
-└── fdc-schemas/                # Web2Json attestation types for APIs
+│
+├── veilmarket-tee/
+│   ├── evaluator.js
+│   ├── fdc-run.js
+│   ├── constants.js
+│   └── payouts/
+│       ├── market-1.json
+│       ├── market-2.json
+│       └── ...
+│
+├── .github/
+│   └── workflows/
+│       └── fdc-full-run.yml
+│
+├── index.html
+├── foundry.toml
+├── package.json
+└── README.md
 ```
 
 ---
 
-## 🛠️ Development & Installation
+# 🛠️ Development Setup
 
-Built with **Foundry** and **Soldeer** for Flare dependencies.
+## Prerequisites
 
-### Prerequisites
-- [Foundry](https://getfoundry.sh/) installed
-- A Coston2 Testnet wallet funded with C2FLR ([faucet](https://faucet.flare.network/coston2))
+Install:
 
-### 1. Clone & Install
+- Node.js 20+
+- Foundry
+- Git
+- A Coston2-compatible wallet
+- Coston2 testnet FLR for testing
+
+---
+
+## Clone
+
 ```bash
 git clone https://github.com/Pandey456/VeilMarket.git
 cd VeilMarket
-
-# Install Flare peripherals using Soldeer
-forge soldeer install flare-periphery~0.1.50
 ```
 
-### 2. Import Your Private Key (no plaintext .env)
+---
+
+## Install Node dependencies
+
 ```bash
-cast wallet import <keyName> --interactive
-# 1. Paste your private key
-# 2. Set a password
-# 3. Confirm the success message
+npm install
 ```
 
-### 3. Environment Setup
-Create a `.env` file in the root:
-```env
-COSTON2_RPC_URL=https://coston2-api.flare.network/ext/C/rpc
+The evaluator currently relies on packages including:
+
+```text
+viem
+@openzeppelin/merkle-tree
 ```
 
-### 4. Compile & Test
+---
+
+## Build Solidity contracts
+
 ```bash
 forge build
+```
+
+---
+
+## Run tests
+
+```bash
 forge test -vvv
 ```
 
-### 5. Deploy to Coston2
-```bash
-forge script script/DeployVeilMarket.s.sol \
-  --rpc-url coston2 \
-  --account <keyName> \
-  --broadcast
+---
+
+# 🌐 Flare Coston2
+
+The current demo runs on:
+
+```text
+Flare Coston2
+Chain ID: 114
 ```
 
----
+RPC:
 
-## ⚠️ Security Notes & Known Considerations
+```text
+https://coston2-api.flare.network/ext/C/rpc
+```
 
-- **`finalize` is not implemented.** It reverts `NotImplemented` until FDC + TEE integration lands. **Invariant to enforce when building it:** zero out `stakeOf` (or set a claimed flag) on payout, so a winner cannot both collect a payout _and_ later trigger `emergencyRefund` (double-spend). Also verify `sum(payoutAmounts) <= totalPool` and make resolution idempotent.
-- **Verify the FTSOv2 signature.** On some Flare interface versions `getFeedById` is `payable`, not `view`. Confirm the deployed Coston2 method and adjust the interface (and forward value) if needed.
-- **CEI + reentrancy.** All state-changing external-call functions use the checks-effects-interactions pattern and a `nonReentrant` guard.
-- **Fee rounding.** Integer division rounds down, so the fee can be short of $13 by a dust amount — harmless, and round-up can be added if you prefer.
-- **Not audited.** Testnet / hackathon code. Do not deploy to mainnet with real funds without an audit.
+The project is intentionally deployed to testnet while the architecture is being validated.
 
 ---
 
-## 🔮 Future Scope
-- **Dynamic AMM integration:** move from locked parimutuel pools to continuous trading curves so users can trade position shares before expiry.
-- **FAssets integration:** confidential predictions using non-native tokens like `FXRP` or `FBTC` directly inside the TEE enclave.
+# 🔍 Transparency vs Confidentiality
+
+VeilMarket does not attempt to hide everything.
+
+### Public
+
+```text
+Wallet address
+Stake amount
+Market ID
+Transaction
+Encrypted prediction
+Deadline
+Market outcome after resolution
+Merkle root
+Claim transaction
+```
+
+### Confidential before resolution
+
+```text
+YES / NO prediction
+```
+
+The core objective is therefore not:
+
+> "Make the entire prediction market invisible."
+
+It is:
+
+> **"Prevent other market participants from seeing which side you selected before resolution."**
 
 ---
 
-## 📄 License
-Licensed under the MIT License — see the `LICENSE` file for details.
+# ⚠️ Security Considerations
 
-_Built for the Flare Summer Signal Hackathon._
+### Prediction encryption
+
+The RSA private decryption key must remain secret.
+
+If:
+
+```text
+PREDICTION_PRIVATE_KEY
+```
+
+is compromised, encrypted predictions can be decrypted.
+
+### TEE signing authority
+
+The TEE signing key is the authorization mechanism for `resolveMarket()`.
+
+A compromised TEE signing key could potentially authorize a malicious resolution.
+
+### GitHub Actions
+
+The current demo uses GitHub Actions as the evaluator execution environment.
+
+This is convenient for a public prototype but is not equivalent to a hardened production confidential-compute deployment.
+
+### Merkle payouts
+
+The Merkle root commits the evaluator's payout set.
+
+Users can independently verify that their:
+
+```text
+address + payout
+```
+
+matches the root through their Merkle proof.
+
+### Smart contract
+
+The contract has not been independently audited.
+
+**Do not use this deployment for real funds.**
+
+---
+
+# 🚧 Known Prototype Limitations
+
+1. **GitHub Actions is currently the evaluator execution layer.**
+2. **The TEE architecture is represented by a trusted signing/decryption key boundary; a production hardware-enclave deployment is still a future step.**
+3. **The FDC result is consumed by the evaluator before the signed resolution is submitted.**
+4. **The frontend is intentionally lightweight and currently implemented as HTML/JavaScript.**
+5. **The system is running on Flare Coston2 testnet.**
+6. **No independent security audit has been completed.**
+7. **The current demo focuses on binary YES/NO prediction markets.**
+8. **BTC is currently the primary supported asset in the frontend market builder.**
+
+---
+
+# 🗺️ Roadmap
+
+## Phase 1 — Core Market
+
+- [x] Parimutuel pool
+- [x] Market creation
+- [x] FLR staking
+- [x] Deadline enforcement
+- [x] One prediction per wallet
+- [x] Emergency refund
+- [x] Owner/treasury functionality
+
+## Phase 2 — Confidential Predictions
+
+- [x] Client-side encryption
+- [x] RSA-OAEP prediction ciphertext
+- [x] Encrypted prediction stored on-chain
+- [x] Evaluator-side decryption
+- [x] Prediction direction hidden from block explorers
+
+## Phase 3 — Verifiable Resolution
+
+- [x] FDC Web2Json request
+- [x] Binance BTC price retrieval
+- [x] Deadline-based price query
+- [x] Winning-side calculation
+- [x] TEE authorization signature
+- [x] On-chain signature verification
+
+## Phase 4 — Payouts
+
+- [x] Winning pool calculation
+- [x] Pro-rata payout calculation
+- [x] Merkle tree generation
+- [x] Merkle proof generation
+- [x] On-chain Merkle root
+- [x] Claim payout
+- [x] Claim protection against duplicate claims
+- [x] Payout JSON publication
+
+## Phase 5 — Production Hardening
+
+- [ ] Deploy evaluator inside a hardened confidential-compute environment
+- [ ] Hardware-backed key management
+- [ ] Remove GitHub Actions as the trust boundary
+- [ ] Independent smart-contract audit
+- [ ] Formalize FDC proof verification architecture
+- [ ] Improve decentralized resolution/keeper model
+- [ ] Add additional asset feeds
+- [ ] Add sports and real-world event resolution
+- [ ] Improve monitoring and failure recovery
+- [ ] Mainnet deployment
+
+---
+
+# 🧠 Design Principles
+
+### 1. Hide the decision, not the transaction
+
+The blockchain should still provide transparent evidence that a bet happened.
+
+### 2. Don't store unnecessary payout state on-chain
+
+Merkle proofs allow the contract to commit to a complete payout set using a single root.
+
+### 3. Separate truth from settlement
+
+FDC provides external data.
+
+The evaluator interprets that data and constructs the payout state.
+
+The contract verifies that the authorized evaluator signed the resulting resolution.
+
+### 4. Keep private keys outside the client
+
+The browser gets the public encryption key.
+
+Private decryption/signing keys stay in the evaluator environment.
+
+---
+
+# 📣 Build in Public
+
+VeilMarket is being developed publicly.
+
+Development updates, experiments, debugging sessions, and architecture decisions are shared on X:
+
+**[@pandeyy456](https://x.com/pandeyy456)**
+
+The goal is to document the process of taking a confidential prediction-market idea from a smart-contract prototype to a working end-to-end testnet application.
+
+---
+
+# 🏷️ About the Name
+
+The project currently uses **VeilMarket** because that is the repository and deployed prototype name.
+
+However, the name is not ideal for a long-term product brand.
+
+There are already other projects/products using closely related names, including prediction-market projects using **VEIL**, so a future rename would reduce brand confusion.
+
+For the **hackathon/demo stage**, I recommend keeping:
+
+```text
+VeilMarket
+```
+
+to avoid unnecessary migration work.
+
+Before a public production launch, the project should choose a more distinctive name and migrate:
+
+- repository
+- contract naming where appropriate
+- frontend branding
+- domain/subdomain
+- social handles
+- documentation
+
+---
+
+# 📄 License
+
+Licensed under the MIT License.
+
+---
+
+## Built on Flare Coston2
+
+**Built in public by Adarsh Pandey.**
+
+The current objective is simple:
+
+> **Make prediction markets less predictable from the outside.**
