@@ -57,7 +57,7 @@ jobs:
         run: npm install viem @openzeppelin/merkle-tree
 
       - name: Run Evaluator Engine
-        run: node veilmarket-tee/evaluator.js
+        run: node veyntmarket-tee/evaluator.js
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           TEE_PRIVATE_KEY: ${{ secrets.TEE_PRIVATE_KEY }}
