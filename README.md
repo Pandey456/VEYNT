@@ -22,22 +22,36 @@ Veynt is currently a **testnet prototype** intended to demonstrate the complete 
 
 The system currently supports:
 
+**Market & Staking**
+
 - Market creation on BOT Chain
 - Fixed market creation fee of 1 BOT
 - Native BOT staking
 - Binary YES/NO predictions
+
+**Confidentiality**
+
 - Client-side RSA-OAEP encryption of predictions
 - Encrypted prediction storage on-chain
-- Off-chain evaluation
+
+**Data & Resolution**
+
+- Off-chain market evaluation
 - FDC-powered external price retrieval
 - Price-based market resolution
 - TEE-authorized resolution
+
+**Payouts**
+
 - Proportional winner payouts
 - Merkle tree-based payout verification
 - Individual Merkle proofs for winners
 - On-chain claim verification
 - Emergency refund handling
-- GitHub Actions-based evaluator execution for the current demo
+
+**Infrastructure**
+
+- GitHub Actions-based evaluator execution
 
 The project is **not production-ready** and should not be used with funds that cannot be lost.
 
@@ -238,9 +252,9 @@ The current Veynt implementation uses a fixed creation fee:
 1 BOT
 ```
 
-This is intentionally different from the earlier Flare implementation.
+The user pays 1 BOT when creating a market.
 
-There is no FTSO-based FLR/USD conversion involved in the current BOT Chain implementation.
+This fixed fee keeps market creation simple and predictable while avoiding the need for an external price feed for fee calculation.
 
 The user simply pays:
 
