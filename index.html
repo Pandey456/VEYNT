@@ -3,20 +3,21 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>VeilMarket — Prediction Markets</title>
+    <title>Veynt — Prediction Markets</title>
 
     <style>
       :root {
-        --bg: #07090d;
-        --panel: #0e131b;
-        --panel2: #121925;
-        --border: rgba(255, 255, 255, 0.09);
-        --text: #f5f7fa;
-        --muted: #8c97a6;
+        --bg: #080808;
+        --panel: #111111;
+        --panel2: #171717;
+        --border: rgba(255, 210, 0, 0.14);
+        --text: #f7f7f2;
+        --muted: #9b9b91;
         --green: #35e59a;
         --red: #ff5f6d;
-        --yellow: #f5c451;
-        --blue: #70a7ff;
+        --yellow: #ffd400;
+        --blue: #8fa7ff;
+        --black: #080808;
       }
       * {
         box-sizing: border-box;
@@ -26,12 +27,12 @@
         background:
           radial-gradient(
             circle at 10% 0%,
-            rgba(53, 229, 154, 0.1),
+            rgba(255, 212, 0, 0.12),
             transparent 30%
           ),
           radial-gradient(
             circle at 90% 0%,
-            rgba(112, 167, 255, 0.08),
+            rgba(255, 212, 0, 0.07),
             transparent 28%
           ),
           var(--bg);
@@ -70,8 +71,8 @@
         border-radius: 13px;
         display: grid;
         place-items: center;
-        background: linear-gradient(135deg, var(--green), #a5ffdb);
-        color: #06120d;
+        background: linear-gradient(135deg, var(--yellow), #fff1a3);
+        color: #080808;
         font-weight: 900;
       }
       .brand h1 {
@@ -94,8 +95,8 @@
         cursor: pointer;
       }
       .wallet.connected {
-        background: var(--green);
-        color: #06120d;
+        background: var(--yellow);
+        color: #080808;
       }
       .hero {
         display: flex;
@@ -111,7 +112,7 @@
         margin: 0;
       }
       .hero h2 span {
-        color: var(--green);
+        color: var(--yellow);
       }
       .hero p {
         max-width: 650px;
@@ -133,8 +134,8 @@
         transition: 0.2s;
       }
       .primary {
-        background: var(--green);
-        color: #06120d;
+        background: var(--yellow);
+        color: #080808;
       }
       .primary:hover,
       .claim:hover {
@@ -199,9 +200,9 @@
         font-weight: 900;
         padding: 6px 9px;
         border-radius: 99px;
-        color: var(--green);
-        background: rgba(53, 229, 154, 0.08);
-        border: 1px solid rgba(53, 229, 154, 0.18);
+        color: var(--yellow);
+        background: rgba(255, 212, 0, 0.08);
+        border: 1px solid rgba(255, 212, 0, 0.18);
       }
       .badge.ready {
         color: var(--yellow);
@@ -263,12 +264,12 @@
       .amount:focus,
       .field input:focus,
       .field select:focus {
-        border-color: rgba(53, 229, 154, 0.5);
+        border-color: rgba(255, 212, 0, 0.5);
       }
       .yes {
-        color: var(--green);
-        background: rgba(53, 229, 154, 0.1);
-        border-color: rgba(53, 229, 154, 0.22);
+        color: var(--yellow);
+        background: rgba(255, 212, 0, 0.1);
+        border-color: rgba(255, 212, 0, 0.22);
       }
       .no {
         color: var(--red);
@@ -281,8 +282,8 @@
         border-color: rgba(245, 196, 81, 0.2);
       }
       .claim {
-        background: var(--green);
-        color: #06120d;
+        background: var(--yellow);
+        color: #080808;
       }
       .row {
         display: flex;
@@ -435,7 +436,7 @@
       }
       .sentence-builder select:focus,
       .sentence-builder input:focus {
-        border-color: rgba(53, 229, 154, 0.5);
+        border-color: rgba(255, 212, 0, 0.5);
       }
       .sentence-builder select {
         cursor: pointer;
@@ -468,8 +469,8 @@
         margin-top: 15px;
         padding: 13px 15px;
         border-radius: 13px;
-        background: rgba(53, 229, 154, 0.045);
-        border: 1px solid rgba(53, 229, 154, 0.12);
+        background: rgba(255, 212, 0, 0.045);
+        border: 1px solid rgba(255, 212, 0, 0.12);
       }
       .preview-box small {
         display: block;
@@ -498,8 +499,8 @@
         <div class="brand">
           <div class="logo">V</div>
           <div>
-            <h1>VeilMarket</h1>
-            <p>Decentralized prediction markets</p>
+            <h1>Veynt</h1>
+            <p>Prediction markets · BOT Chain Testnet</p>
           </div>
         </div>
         <button class="wallet" id="connectBtn">Connect Wallet</button>
@@ -509,11 +510,11 @@
         <div>
           <h2>Predict what happens.<br /><span>Prove what happened.</span></h2>
           <p>
-            Place a prediction before the deadline. Verified data determines the
-            winning side, and winners can claim their payout automatically.
+            Create a market, make your prediction, and let the Veynt TEE verify
+            the outcome. Winners can claim their BOT payout after resolution.
           </p>
         </div>
-        <button class="primary" id="openCreateBtn">＋ Add Question</button>
+        <button class="primary" id="openCreateBtn">＋ Create Market</button>
       </section>
 
       <div class="toolbar">
@@ -532,10 +533,10 @@
       <div class="modal">
         <div class="modal-head">
           <div>
-            <h3>Create a prediction</h3>
+            <h3>Create a market</h3>
             <p>
               Set the asset, direction, target price and how long the market
-              stays open.
+              stays open. Market creation costs 1 BOT.
             </p>
           </div>
           <button class="close" data-close="createModal">×</button>
@@ -573,8 +574,7 @@
         <div class="preview-box">
           <small>MARKET PREVIEW</small>
           <strong id="questionPreview"
-            >Will the price of BTC be above than $65,000 after 5
-            minutes?</strong
+            >Will the price of BTC be above $65,000 after 5 minutes?</strong
           >
         </div>
 
@@ -592,13 +592,13 @@
             <h3>Resolve market</h3>
             <p>
               Enter a GitHub Personal Access Token with permission to trigger
-              the VeilMarket evaluator workflow.
+              the Veynt evaluator workflow.
             </p>
           </div>
           <button class="close" data-close="resolveModal">×</button>
         </div>
 
-        <div class="field">
+        <form class="field" id="resolveForm" onsubmit="return false;">
           <label for="githubPat">GitHub Personal Access Token</label>
           <input
             id="githubPat"
@@ -606,7 +606,7 @@
             autocomplete="off"
             placeholder="github_pat_…"
           />
-        </div>
+        </form>
 
         <p class="note">
           Your PAT is used only for this GitHub workflow request and is not
@@ -635,15 +635,22 @@
         formatEther,
       } from "https://esm.sh/viem@2.55.11";
 
-      const coston2 = defineChain({
-        id: 114,
-        name: "Flare Coston2",
-        nativeCurrency: { name: "Coston2 FLR", symbol: "C2FLR", decimals: 18 },
+      const botChainTestnet = defineChain({
+        id: 968,
+        name: "BOT Chain Testnet",
+        nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
         rpcUrls: {
-          default: { http: ["https://coston2-api.flare.network/ext/C/rpc"] },
+          default: { http: ["https://rpc.bohr.life"] },
+        },
+        blockExplorers: {
+          default: {
+            name: "BOTScan",
+            url: "https://scan.bohr.life",
+          },
         },
       });
 
+      // Deployed VeyntMarket on BOT Chain Testnet (Chain ID 968)
       const CONTRACT_ADDRESS = "0xae1cf56E2Df39E4EE9203DcEd781C75799E36202";
       const PREDICTION_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArKeKZMf2oDUJWwLlrUDy
@@ -682,13 +689,6 @@ twIDAQAB
         },
         {
           type: "function",
-          name: "getRequiredFee",
-          stateMutability: "view",
-          inputs: [],
-          outputs: [{ type: "uint256" }],
-        },
-        {
-          type: "function",
           name: "createMarket",
           stateMutability: "payable",
           inputs: [
@@ -724,10 +724,45 @@ twIDAQAB
           stateMutability: "nonpayable",
           inputs: [
             { type: "uint256", name: "marketId" },
-            { type: "uint256", name: "amount" },
-            { type: "bytes32[]", name: "proof" },
+            { type: "uint256", name: "payout" },
+            { type: "bytes32[]", name: "merkleProof" },
           ],
           outputs: [],
+        },
+        {
+          type: "function",
+          name: "MARKET_CREATION_FEE",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ type: "uint256" }],
+        },
+        {
+          type: "function",
+          name: "emergencyRefund",
+          stateMutability: "nonpayable",
+          inputs: [{ type: "uint256", name: "marketId" }],
+          outputs: [],
+        },
+        {
+          type: "function",
+          name: "i_teeSigner",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ type: "address" }],
+        },
+        {
+          type: "function",
+          name: "owner",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ type: "address" }],
+        },
+        {
+          type: "function",
+          name: "accumulatedTreasuryFees",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ type: "uint256" }],
         },
       ];
 
@@ -738,7 +773,51 @@ twIDAQAB
 
       const ZERO = "0x0000000000000000000000000000000000000000";
 
+      const BOT_CHAIN_ID_HEX = "0x3c8";
+
       const $ = (id) => document.getElementById(id);
+
+      async function ensureBotChain() {
+        if (!window.ethereum) {
+          throw new Error("Please install MetaMask.");
+        }
+
+        const currentChainId = await window.ethereum.request({
+          method: "eth_chainId",
+        });
+
+        if (currentChainId.toLowerCase() === BOT_CHAIN_ID_HEX) {
+          return;
+        }
+
+        try {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: BOT_CHAIN_ID_HEX }],
+          });
+        } catch (switchError) {
+          if (switchError?.code !== 4902) {
+            throw switchError;
+          }
+
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: BOT_CHAIN_ID_HEX,
+                chainName: "BOT Chain Testnet",
+                nativeCurrency: {
+                  name: "BOT",
+                  symbol: "BOT",
+                  decimals: 18,
+                },
+                rpcUrls: ["https://rpc.bohr.life"],
+                blockExplorerUrls: ["https://scan.bohr.life"],
+              },
+            ],
+          });
+        }
+      }
 
       function toast(message) {
         const el = $("toast");
@@ -782,7 +861,7 @@ twIDAQAB
           const direction = parts[1].toLowerCase();
           const price = Number(parts[2]) / 1e8;
 
-          return `Will the price of ${asset} be ${direction} than $${price.toLocaleString()}?`;
+          return `Will the price of ${asset} be ${direction} $${price.toLocaleString()}?`;
         }
 
         return question;
@@ -795,8 +874,10 @@ twIDAQAB
         }
 
         try {
+          await ensureBotChain();
+
           provider = createWalletClient({
-            chain: coston2,
+            chain: botChainTestnet,
             transport: custom(window.ethereum),
           }).extend(publicActions);
 
@@ -890,7 +971,7 @@ twIDAQAB
             <div class="meta">
               <div>
                 <small>POOL</small>
-                <strong>${formatEther(market.totalPool)} FLR</strong>
+                <strong>${formatEther(market.totalPool)} BOT</strong>
               </div>
 
               <div>
@@ -939,7 +1020,7 @@ twIDAQAB
           <div class="meta">
             <div>
               <small>POOL</small>
-              <strong>${formatEther(market.totalPool)} FLR</strong>
+              <strong>${formatEther(market.totalPool)} BOT</strong>
             </div>
 
             <div>
@@ -964,7 +1045,7 @@ twIDAQAB
               type="number"
               min="0"
               step="0.01"
-              placeholder="Amount in FLR"
+              placeholder="Amount in BOT"
             />
 
             <button
@@ -1020,7 +1101,7 @@ twIDAQAB
         const minutes = Number($("deadlineOffset").value || 0);
 
         $("questionPreview").textContent =
-          `Will the price of ${asset} be ${direction.toLowerCase()} than $${price.toLocaleString()} after ${minutes} minutes?`;
+          `Will the price of ${asset} be ${direction.toLowerCase()} $${price.toLocaleString()} after ${minutes} minutes?`;
       }
 
       async function createMarket() {
@@ -1054,9 +1135,9 @@ twIDAQAB
           const deadline =
             Math.floor((Date.now() + minutes * 60 * 1000) / 60000) * 60;
 
-          const baseFee = await contract.read.getRequiredFee();
-
-          const fee = baseFee + (baseFee * 5n) / 100n;
+          // VeyntMarket uses a fixed 1 BOT creation fee.
+          // No FTSO / getRequiredFee() call is needed.
+          const marketCreationFee = parseEther("1");
 
           const txHash = await contract.write.createMarket(
             [
@@ -1065,7 +1146,7 @@ twIDAQAB
               "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1m",
             ],
             {
-              value: fee,
+              value: marketCreationFee,
               account: signer.address,
             },
           );
@@ -1080,7 +1161,7 @@ twIDAQAB
 
           $("createModal").classList.remove("open");
 
-          toast("Market created successfully.");
+          toast("Market created successfully — 1 BOT creation fee paid.");
 
           await loadMarkets();
         } catch (error) {
@@ -1197,7 +1278,7 @@ twIDAQAB
         /*
          * Direct GitHub Actions workflow_dispatch.
          *
-         * This is the same mechanism as the old working
+         * This is the same mechanism as the existing working
          * "Trigger TEE Finalize Workflow" section.
          *
          * The PAT is supplied by the user at runtime.
@@ -1292,8 +1373,7 @@ twIDAQAB
           button.disabled = true;
           button.textContent = "Claiming…";
 
-          const url = `https://raw.githubusercontent.com/Pandey456/VeilMarket/main/veilmarket-tee/payouts/market-${marketId}.json?t=${Date.now()}`;
-
+          const url = `https://raw.githubusercontent.com/Pandey456/VEYNT/main/veyntmarket-tee/payouts/market-${marketId}.json?t=${Date.now()}`;
           const response = await fetch(url);
 
           if (!response.ok) {
@@ -1336,7 +1416,7 @@ twIDAQAB
           }
 
           toast(
-            `Claimed ${winner.payoutFlr || formatEther(BigInt(winner.payout))} FLR.`,
+            `Claimed ${winner.payoutBot || formatEther(BigInt(winner.payout))} BOT.`,
           );
 
           await loadMarkets();

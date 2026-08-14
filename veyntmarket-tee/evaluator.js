@@ -6,14 +6,28 @@ const {
   decodeAbiParameters,
   parseAbiParameters,
   keccak256,
+  defineChain,
   encodePacked,
 } = require("viem");
 
 const { privateKeyToAccount } = require("viem/accounts");
-const { coston2 } = require("viem/chains");
+const botChainTestnet = defineChain({
+  id: 968,
+  name: "BOT Chain Testnet",
+  nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
+  rpcUrls: {
+    default: { http: ["https://rpc.bohr.life"] },
+  },
+  blockExplorers: {
+    default: {
+      name: "BOTScan",
+      url: "https://scan.bohr.life",
+    },
+  },
+});
 const { StandardMerkleTree } = require("@openzeppelin/merkle-tree");
 
-const { VEIL_MARKET_ADDRESS, VEIL_MARKET_ABI } = require("./constants.js");
+const { VEYNT_MARKET_ADDRESS, VEYNT_MARKET_ABI } = require("./constants.js");
 
 const fs = require("fs");
 const path = require("path");
@@ -22,11 +36,11 @@ const path = require("path");
 // CONFIGURATION
 // ============================================================
 
-const MARKET_ID = BigInt(process.env.MARKET_ID);
-
 if (!process.env.MARKET_ID) {
   throw new Error("FATAL: MARKET_ID environment variable is missing.");
 }
+
+const MARKET_ID = BigInt(process.env.MARKET_ID);
 
 if (!process.env.PRIVATE_KEY) {
   throw new Error("FATAL: PRIVATE_KEY environment variable is missing.");
@@ -41,11 +55,11 @@ if (!process.env.PREDICTION_PRIVATE_KEY) {
   );
 }
 
-if (!VEIL_MARKET_ADDRESS) {
-  throw new Error("FATAL: VEIL_MARKET_ADDRESS is missing.");
+if (!VEYNT_MARKET_ADDRESS) {
+  throw new Error("FATAL: VEYNT_MARKET_ADDRESS is missing.");
 }
 
-const RPC_URL = "https://coston2-api.flare.network/ext/C/rpc";
+const RPC_URL = "https://rpc.bohr.life";
 
 // ============================================================
 // ACCOUNTS
@@ -64,13 +78,13 @@ const teeAccount = privateKeyToAccount(process.env.TEE_PRIVATE_KEY);
 // ============================================================
 
 const publicClient = createPublicClient({
-  chain: coston2,
+  chain: botChainTestnet,
   transport: http(RPC_URL),
 });
 
 const walletClient = createWalletClient({
   account: deployerAccount,
-  chain: coston2,
+  chain: botChainTestnet,
   transport: http(RPC_URL),
 });
 
@@ -135,8 +149,8 @@ function decryptPrediction(encodedPrediction) {
 
 async function getMarket() {
   const market = await publicClient.readContract({
-    address: VEIL_MARKET_ADDRESS,
-    abi: VEIL_MARKET_ABI,
+    address: VEYNT_MARKET_ADDRESS,
+    abi: VEYNT_MARKET_ABI,
     functionName: "markets",
     args: [MARKET_ID],
   });
@@ -279,8 +293,8 @@ function determineWinningSide(direction, verifiedPrice, targetPrice) {
 
 async function getBettors() {
   const bettors = await publicClient.readContract({
-    address: VEIL_MARKET_ADDRESS,
-    abi: VEIL_MARKET_ABI,
+    address: VEYNT_MARKET_ADDRESS,
+    abi: VEYNT_MARKET_ABI,
     functionName: "getBettors",
     args: [MARKET_ID],
   });
@@ -294,15 +308,15 @@ async function getBettors() {
 
 async function getBettorPrediction(bettor) {
   const stake = await publicClient.readContract({
-    address: VEIL_MARKET_ADDRESS,
-    abi: VEIL_MARKET_ABI,
+    address: VEYNT_MARKET_ADDRESS,
+    abi: VEYNT_MARKET_ABI,
     functionName: "stakeOf",
     args: [MARKET_ID, bettor],
   });
 
   const encryptedPrediction = await publicClient.readContract({
-    address: VEIL_MARKET_ADDRESS,
-    abi: VEIL_MARKET_ABI,
+    address: VEYNT_MARKET_ADDRESS,
+    abi: VEYNT_MARKET_ABI,
     functionName: "getPrediction",
     args: [MARKET_ID, bettor],
   });
@@ -467,7 +481,7 @@ function createPayoutMerkleTree(payouts) {
       payout: winner.payout.toString(),
 
       // Human-readable value for frontend
-      payoutFlr: Number(winner.payout) / 1e18,
+      payoutBot: Number(winner.payout) / 1e18,
 
       // Merkle proof required by claimPayout()
       proof,
@@ -517,7 +531,7 @@ function saveClaimData({
   const claimData = {
     marketId: MARKET_ID.toString(),
 
-    contractAddress: VEIL_MARKET_ADDRESS,
+    contractAddress: VEYNT_MARKET_ADDRESS,
 
     question: market.question,
 
@@ -540,7 +554,7 @@ function saveClaimData({
 
       payout: winner.payout,
 
-      payoutFlr: winner.payoutFlr,
+      payoutBot: winner.payoutBot,
 
       proof: winner.proof,
     })),
@@ -604,8 +618,8 @@ async function submitResolution(merkleRoot, winningOutcome, signature) {
   console.log("\nSubmitting resolveMarket...");
 
   const txHash = await walletClient.writeContract({
-    address: VEIL_MARKET_ADDRESS,
-    abi: VEIL_MARKET_ABI,
+    address: VEYNT_MARKET_ADDRESS,
+    abi: VEYNT_MARKET_ABI,
     functionName: "resolveMarket",
     args: [MARKET_ID, merkleRoot, winningOutcome, signature],
   });
@@ -775,7 +789,7 @@ async function runProductionEvaluator() {
 
     console.log(`Payout: ${winner.payout} wei`);
 
-    console.log(`Payout: ${winner.payoutFlr} FLR`);
+    console.log(`Payout: ${winner.payoutBot} FLR`);
 
     console.log(`Proof: ${JSON.stringify(winner.proof)}`);
   }
@@ -849,7 +863,7 @@ async function runProductionEvaluator() {
   console.log("\nWinners:");
 
   for (const winner of winnersWithProofs) {
-    console.log(`  ${winner.bettor} → ${winner.payoutFlr} FLR`);
+    console.log(`  ${winner.bettor} → ${winner.payoutBot} BOT`);
   }
 
   console.log("==========================================\n");

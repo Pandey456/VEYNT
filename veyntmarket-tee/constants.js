@@ -1,144 +1,172 @@
-const VEIL_MARKET_ADDRESS = process.env.VEIL_MARKET_ADDRESS;
+const VEYNT_MARKET_ADDRESS = process.env.VEYNT_MARKET_ADDRESS;
 
-if (!VEIL_MARKET_ADDRESS) {
+if (!VEYNT_MARKET_ADDRESS) {
   throw new Error(
-    "FATAL: VEIL_MARKET_ADDRESS environment variable is missing.",
+    "FATAL: VEYNT_MARKET_ADDRESS environment variable is missing.",
   );
 }
+// constants.js
 
-const VEIL_MARKET_ABI = [
+// const VEYNT_MARKET_ADDRESS =
+//   "0xae1cf56E2Df39E4EE9203DcEd781C75799E36202";
+
+const VEYNT_MARKET_ABI = [
   {
     type: "function",
     name: "markets",
-    stateMutability: "view",
     inputs: [
       {
+        name: "",
         type: "uint256",
-        name: "marketId",
+        internalType: "uint256",
       },
     ],
     outputs: [
       {
-        type: "address",
         name: "owner",
+        type: "address",
+        internalType: "address",
       },
       {
-        type: "string",
         name: "apiEndpoint",
-      },
-      {
         type: "string",
+        internalType: "string",
+      },
+      {
         name: "question",
+        type: "string",
+        internalType: "string",
       },
       {
-        type: "uint256",
         name: "deadline",
-      },
-      {
         type: "uint256",
+        internalType: "uint256",
+      },
+      {
         name: "totalPool",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        type: "bool",
         name: "resolved",
-      },
-      {
         type: "bool",
-        name: "outcome",
+        internalType: "bool",
       },
       {
-        type: "bytes32",
+        name: "outcome",
+        type: "bool",
+        internalType: "bool",
+      },
+      {
         name: "merkleRoot",
+        type: "bytes32",
+        internalType: "bytes32",
       },
     ],
+    stateMutability: "view",
   },
 
   {
     type: "function",
     name: "getBettors",
-    stateMutability: "view",
     inputs: [
       {
+        name: "_marketId",
         type: "uint256",
-        name: "marketId",
+        internalType: "uint256",
       },
     ],
     outputs: [
       {
+        name: "",
         type: "address[]",
+        internalType: "address[]",
       },
     ],
+    stateMutability: "view",
   },
 
   {
     type: "function",
     name: "getPrediction",
-    stateMutability: "view",
     inputs: [
       {
+        name: "_marketId",
         type: "uint256",
-        name: "marketId",
+        internalType: "uint256",
       },
       {
+        name: "_bettor",
         type: "address",
-        name: "bettor",
+        internalType: "address",
       },
     ],
     outputs: [
       {
+        name: "",
         type: "bytes",
+        internalType: "bytes",
       },
     ],
+    stateMutability: "view",
   },
 
   {
     type: "function",
     name: "stakeOf",
-    stateMutability: "view",
     inputs: [
       {
-        type: "uint256",
         name: "marketId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        type: "address",
         name: "bettor",
+        type: "address",
+        internalType: "address",
       },
     ],
     outputs: [
       {
+        name: "stake",
         type: "uint256",
+        internalType: "uint256",
       },
     ],
+    stateMutability: "view",
   },
 
   {
     type: "function",
     name: "resolveMarket",
-    stateMutability: "nonpayable",
     inputs: [
       {
-        type: "uint256",
         name: "_marketId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        type: "bytes32",
         name: "_merkleRoot",
+        type: "bytes32",
+        internalType: "bytes32",
       },
       {
-        type: "string",
         name: "_outcome",
+        type: "string",
+        internalType: "string",
       },
       {
-        type: "bytes",
         name: "_signature",
+        type: "bytes",
+        internalType: "bytes",
       },
     ],
     outputs: [],
+    stateMutability: "nonpayable",
   },
 ];
 
 module.exports = {
-  VEIL_MARKET_ADDRESS,
-  VEIL_MARKET_ABI,
+  VEYNT_MARKET_ADDRESS,
+  VEYNT_MARKET_ABI,
 };
