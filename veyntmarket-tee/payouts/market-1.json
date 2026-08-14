@@ -1,0 +1,20 @@
+{
+  "marketId": "1",
+  "contractAddress": "0xae1cf56E2Df39E4EE9203DcEd781C75799E36202",
+  "question": "BTC|ABOVE|6500000000000",
+  "winningOutcome": "NO",
+  "verifiedPrice": "6307360000000",
+  "targetPrice": "6500000000000",
+  "merkleRoot": "0x035a34290631e382ff9f3ba2bebab43f48315218ec5b4fe924107298b1313f4f",
+  "blockNumber": "19863295",
+  "transactionHash": "0x136e0687f2062d251084779db67d04fdf34d3fa3b0dbbceddfb9eec897b80426",
+  "winners": [
+    {
+      "bettor": "0xEC132E529396Da0f38f6ebcb0af11e8Be927B8FB",
+      "stake": "1000000000000000000",
+      "payout": "1720000000000000000",
+      "payoutBot": 1.72,
+      "proof": []
+    }
+  ]
+}
