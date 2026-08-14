@@ -2,7 +2,7 @@
 
 ## Confidential prediction markets with FDC-powered resolution on BOT Chain
 
-> Veynt (@BOTChain-bot) is a prototype confidential prediction market where users can take positions on binary outcomes without publicly revealing whether they selected YES or NO before the market is resolved.
+> Veynt ( Built for @BOTChain-bot ) is a prototype confidential prediction market where users can take positions on binary outcomes without publicly revealing whether they selected YES or NO before the market is resolved.
 
 Veynt combines encrypted predictions, Flare Data Connector (FDC) data retrieval, an off-chain evaluator, TEE-authorized resolution, and Merkle-based payouts.
 
