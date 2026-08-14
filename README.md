@@ -1,87 +1,85 @@
-# VeilMarket
+# Veynt
 
-## Confidential prediction markets on Flare
+## Confidential prediction markets with FDC-powered resolution on BOT Chain
 
-> **VeilMarket is a prototype confidential parimutuel prediction market built on Flare Coston2.**
->
-> Users submit encrypted YES/NO predictions, while stake amounts and wallet addresses remain publicly visible on-chain. Markets are resolved using real-world data retrieved through Flare Data Connector (FDC), with an evaluator producing the final outcome, payout allocation, Merkle tree, and TEE-authorized resolution.
+> Veynt is a prototype confidential prediction market where users can take positions on binary outcomes without publicly revealing whether they selected YES or NO before the market is resolved.
 
-**Live demo:** https://veilmarket.adarshpandey.xyz  
-**Repository:** https://github.com/Pandey456/VeilMarket  
-**Build in public:** https://x.com/pandeyy456
+Veynt combines encrypted predictions, Flare Data Connector (FDC) data retrieval, an off-chain evaluator, TEE-authorized resolution, and Merkle-based payouts.
 
-<p align="center">
-  <img alt="Solidity" src="https://img.shields.io/badge/Solidity-0.8.20-363636?logo=solidity" />
-  <img alt="Foundry" src="https://img.shields.io/badge/Built%20with-Foundry-black" />
-  <img alt="Flare" src="https://img.shields.io/badge/Network-Flare%20Coston2-e62058" />
-  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-20-339933?logo=node.js" />
-  <img alt="License" src="https://img.shields.io/badge/License-MIT-blue" />
-</p>
+The market itself is created, funded, and resolved on BOT Chain. For supported price-based markets, external price data is retrieved through Flare's Data Connector and passed into the evaluator. The evaluator determines the outcome and prepares the settlement data before submitting the authorized resolution back to BOT Chain.
+
+**Live application:**  
+https://veyntmarket.adarshpandey.xyz/
+
+**Repository:**  
+https://github.com/Pandey456/VEYNT
 
 ---
 
-## ⚠️ Demo Status
+## Project Status
 
-VeilMarket is currently a **working Coston2 testnet prototype**, not a production prediction market.
+Veynt is currently a **testnet prototype** intended to demonstrate the complete prediction-market lifecycle.
 
-The end-to-end demo flow has been implemented and tested:
+The system currently supports:
 
-- [x] Create markets from the frontend
-- [x] Create markets with FTSO-derived FLR/USD fee calculation
-- [x] Place YES/NO predictions
-- [x] Restrict each wallet to one prediction per market
-- [x] Encrypt prediction choices client-side
-- [x] Store encrypted predictions on-chain
-- [x] Retrieve the encrypted bettor list during evaluation
-- [x] Resolve crypto-price markets using FDC Web2Json
-- [x] Determine the winning side from the verified price
-- [x] Calculate proportional payouts
-- [x] Build a Merkle tree for winning bettors
-- [x] Generate individual Merkle proofs
-- [x] Sign the resolution payload with the configured TEE signing key
-- [x] Verify the TEE signature on-chain
-- [x] Store the Merkle root on-chain
-- [x] Generate claim data for winners
-- [x] Publish payout JSON through GitHub Actions
-- [x] Allow winners to claim using a Merkle proof
-- [x] Provide an emergency refund path for unresolved markets
+- Market creation on BOT Chain
+- Fixed market creation fee of 1 BOT
+- Native BOT staking
+- Binary YES/NO predictions
+- Client-side RSA-OAEP encryption of predictions
+- Encrypted prediction storage on-chain
+- Off-chain evaluation
+- FDC-powered external price retrieval
+- Price-based market resolution
+- TEE-authorized resolution
+- Proportional winner payouts
+- Merkle tree-based payout verification
+- Individual Merkle proofs for winners
+- On-chain claim verification
+- Emergency refund handling
+- GitHub Actions-based evaluator execution for the current demo
 
-### What is not production-ready
+The project is **not production-ready** and should not be used with funds that cannot be lost.
 
-- The evaluator currently runs through GitHub Actions for the public demo.
-- The signing key and prediction-decryption key are supplied to the evaluator through GitHub Actions secrets.
-- The current implementation should **not** be treated as a production-grade hardware TEE deployment.
-- The system has not been independently audited.
-- The current demo is intended to demonstrate the architecture and end-to-end mechanics on Coston2.
+There has not yet been an independent security audit or a production-grade confidential-computing deployment.
 
 ---
 
 # The Problem
 
-Traditional prediction markets expose a user's position publicly.
+Traditional prediction markets expose a user's prediction direction.
 
-If a user sees:
+For example, a public market may effectively reveal:
 
 ```text
-Alice → YES → 100 FLR
-Bob   → YES → 500 FLR
-Charlie → NO → 2 FLR
+Alice    → YES → 100 BOT
+Bob      → YES → 500 BOT
+Charlie  → NO  → 20 BOT
 ```
 
-they can infer market sentiment and potentially follow large positions.
+Even when the market itself is transparent, exposing the prediction direction before resolution can influence subsequent participants.
 
-This creates:
+This can lead to:
 
-- herding bias
-- copy trading
-- information leakage
-- strategic behavior based on other users' positions
+- Herding
+- Copy trading
+- Information leakage
+- Strategic behavior based on other participants
+- Distorted market sentiment
 
-VeilMarket attempts to hide the **prediction direction** while keeping the settlement verifiable.
+Veynt takes a different approach.
 
-### What is private?
+The transaction and stake remain visible on-chain, but the actual prediction direction is encrypted until the evaluation process takes place.
 
-The prediction:
+The objective is simple:
+
+> Hide the prediction direction while keeping the market settlement verifiable.
+
+---
+
+# What Is Private?
+
+A user selects:
 
 ```text
 YES
@@ -93,176 +91,170 @@ or:
 NO
 ```
 
-is encrypted before it reaches the blockchain.
+The prediction is encrypted in the browser before it is submitted to the smart contract.
 
-### What remains public?
+The current implementation uses:
 
-The following are inherently visible on an EVM chain:
+```text
+RSA-OAEP
+SHA-256
+```
 
-- wallet address
-- transaction
-- stake amount
-- market ID
-- encrypted prediction ciphertext
-- transaction timestamp
-- contract address
+The frontend uses the public encryption key.
 
-VeilMarket therefore does **not** claim that the entire bet is private.
+The corresponding private decryption key is kept outside the frontend and supplied only to the evaluator environment.
 
-The specific goal is:
+---
 
-> **Hide the prediction direction until the market resolves.**
+# What Remains Public?
+
+Veynt does not claim to make the entire prediction market private.
+
+An EVM blockchain still exposes information such as:
+
+- Wallet address
+- Transaction
+- Stake amount
+- Market ID
+- Contract address
+- Deadline
+- Encrypted prediction ciphertext
+- Resolution transaction
+- Market outcome after resolution
+- Merkle root
+
+The key distinction is:
+
+```text
+Public:
+    Alice placed 10 BOT
+
+Not publicly revealed before evaluation:
+    Alice selected YES
+```
+
+The purpose is therefore not full transaction privacy.
+
+It is prediction-direction confidentiality.
 
 ---
 
 # Architecture
 
-VeilMarket currently combines four major components.
+The current architecture separates the blockchain settlement layer from the external-data and evaluation layer.
 
 ```text
-                    ┌─────────────────────────┐
-                    │       Frontend           │
-                    │  veilmarket.adarsh...   │
-                    └────────────┬────────────┘
+                    ┌──────────────────────────┐
+                    │         Frontend         │
+                    │                          │
+                    │ veyntmarket.adarsh...    │
+                    └────────────┬─────────────┘
                                  │
-                     Encrypt YES / NO
+                         Encrypt YES / NO
                                  │
                                  ▼
-                    ┌─────────────────────────┐
-                    │   VeilMarket Contract   │
-                    │      Flare Coston2      │
-                    └──────┬─────────┬────────┘
-                           │         │
-                  encrypted bets     │
-                           │         │
-                           ▼         ▼
-                    ┌──────────┐  ┌──────────┐
-                    │Evaluator │  │  FDC     │
-                    │GitHub    │  │Web2Json  │
-                    │Actions   │  │          │
-                    └────┬─────┘  └────┬─────┘
-                         │             │
-                         │ decrypt     │ verified
-                         │ predictions│ response
-                         └──────┬──────┘
+                    ┌──────────────────────────┐
+                    │     VeyntMarket.sol      │
+                    │        BOT Chain         │
+                    └────────────┬─────────────┘
+                                 │
+                    Encrypted predictions
+                                 │
+                                 ▼
+                    ┌──────────────────────────┐
+                    │       Evaluator          │
+                    │      GitHub Actions      │
+                    └────────────┬─────────────┘
+                                 │
+                  ┌──────────────┴──────────────┐
+                  │                             │
+                  ▼                             ▼
+        ┌──────────────────┐          ┌──────────────────┐
+        │       FDC        │          │  Prediction      │
+        │   Flare Data     │          │   Decryption     │
+        │    Connector     │          │   Private Key    │
+        └────────┬─────────┘          └────────┬─────────┘
+                 │                             │
+          Verified external                YES / NO
+             price data                       │
+                 │                             │
+                 └──────────────┬──────────────┘
                                 │
-                         determine winner
+                                ▼
+                       Determine outcome
                                 │
-                         calculate payouts
+                                ▼
+                       Calculate payouts
                                 │
+                                ▼
                          Merkle tree
                                 │
+                                ▼
                          TEE signature
                                 │
                                 ▼
-                    ┌─────────────────────────┐
-                    │    resolveMarket()      │
-                    │   Signature verified    │
-                    │   Merkle root stored    │
-                    └────────────┬────────────┘
+                    ┌──────────────────────────┐
+                    │     BOT Chain            │
+                    │    resolveMarket()       │
+                    │                          │
+                    │  Outcome + Merkle Root  │
+                    └────────────┬─────────────┘
                                  │
                                  ▼
-                         ┌───────────────┐
-                         │ claimPayout() │
-                         │ Merkle proof  │
-                         └───────────────┘
+                         claimPayout()
 ```
 
----
-
-# Confidential Prediction Flow
-
-## 1. User chooses YES or NO
-
-The frontend never sends plaintext:
-
-```text
-YES
-```
-
-or:
-
-```text
-NO
-```
-
-to the contract.
-
-Instead, the choice is encrypted client-side.
-
-The current prototype uses:
-
-**RSA-OAEP with SHA-256**
-
-The public encryption key is safe to expose in the frontend.
-
-The corresponding private decryption key is kept outside the frontend and supplied to the evaluator as:
-
-```text
-PREDICTION_PRIVATE_KEY
-```
-
-### Encryption flow
-
-```text
-User choice
-    │
-    ▼
-"YES"
-    │
-    ▼
-RSA-OAEP(SHA-256)
-    │
-    │ public key
-    ▼
-256-byte ciphertext
-    │
-    ▼
-predict(marketId, encryptedChoice)
-    │
-    ▼
-Flare Coston2
-```
-
-A block explorer can therefore see the ciphertext, but cannot simply UTF-8 decode it back to `YES` or `NO`.
+The important distinction is that **FDC is used as the source of external data, while BOT Chain is the settlement and resolution chain.**
 
 ---
 
 # Market Lifecycle
 
-## 1. Create Market
+## 1. Create a Market
 
-A user connects a wallet and creates a market.
+A user connects a wallet and creates a prediction market through the Veynt frontend.
 
-The frontend presents the question in a structured form such as:
-
-```text
-Will the price of BTC be above $65,000 after 5 minutes?
-```
-
-Internally the evaluator uses a normalized representation:
+A market contains information such as:
 
 ```text
-BTC|ABOVE|6500000000000
+Question
+Deadline
+Data/API endpoint
 ```
 
-The price uses 8 decimal places:
+For example:
 
 ```text
-65000 USD
-→
-6500000000000
+Will BTC be above $65,000 at the market deadline?
 ```
 
-The deadline is stored as a Unix timestamp.
+The market is created directly on BOT Chain.
 
-The market also stores the API endpoint used by the evaluator/FDC request.
+### Market Creation Fee
+
+The current Veynt implementation uses a fixed creation fee:
+
+```text
+1 BOT
+```
+
+This is intentionally different from the earlier Flare implementation.
+
+There is no FTSO-based FLR/USD conversion involved in the current BOT Chain implementation.
+
+The user simply pays:
+
+```text
+1 BOT
+```
+
+when creating a market.
 
 ---
 
-## 2. Place Prediction
+# 2. Place a Prediction
 
-A user enters a stake and chooses:
+A user chooses:
 
 ```text
 YES
@@ -274,69 +266,91 @@ or:
 NO
 ```
 
-The frontend encrypts the choice and calls:
+The frontend does not submit the plaintext prediction.
 
-```solidity
-predict(
-    uint256 marketId,
-    bytes encryptedChoice
-)
+Instead:
+
+```text
+User choice
+     |
+     v
+"YES"
+     |
+     v
+RSA-OAEP
+SHA-256
+     |
+     v
+Encrypted ciphertext
+     |
+     v
+predict(marketId, encryptedChoice)
+     |
+     v
+BOT Chain
 ```
 
-The contract:
+The contract stores the encrypted prediction.
 
-1. verifies the market exists
-2. verifies the market has not expired
-3. requires a non-zero stake
-4. records the user's stake
-5. emits the encrypted prediction
-
-The prediction itself is not stored as plaintext.
-
-### One prediction per wallet
-
-The current demo treats one wallet as one predictor per market.
-
-This avoids a user creating multiple prediction entries from the same wallet for the same market.
+The current implementation allows one prediction per wallet for a given market.
 
 ---
 
-# FDC Resolution
+# 3. Market Reaches Its Deadline
 
-For the current crypto-price demo, Flare Data Connector's **Web2Json** attestation flow is used to retrieve Binance market data.
+Once the market reaches its deadline, the evaluator begins the resolution process.
 
-Example endpoint:
+For a price-based market, the evaluator needs the relevant external price at the specified market deadline.
 
-```text
-https://data-api.binance.vision/api/v3/klines
-```
+This is where Flare Data Connector is used.
 
-The evaluator constructs an FDC request using:
+---
 
-```text
-symbol = BTCUSDT
-interval = 1m
-startTime = market deadline
-limit = 1
-```
+# FDC-Powered Price Resolution
 
-The response is post-processed into an integer price with 8 decimal places.
+Veynt uses Flare Data Connector to retrieve externally sourced data for supported markets.
 
-Example:
+The current flow is:
 
 ```text
-$64,540
+BOT Chain market
+       |
+       | market question + deadline
+       v
+Evaluator
+       |
+       v
+FDC request
+       |
+       v
+External data source
+       |
+       v
+FDC attested response
+       |
+       v
+Evaluator
+       |
+       v
+Determine winning outcome
+       |
+       v
+BOT Chain resolution
 ```
 
-becomes:
+The important architectural point is:
+
+> FDC provides the external data used by the evaluator. BOT Chain remains the chain where the Veynt market exists and where the final authorized resolution is recorded.
+
+For example, a market could represent:
 
 ```text
-6454000000000
+Will BTC be above $65,000 at the deadline?
 ```
 
-The evaluator then compares the verified price with the market target.
+The evaluator obtains the relevant BTC price through the FDC flow and compares it against the market condition.
 
-Example:
+Conceptually:
 
 ```text
 Target:  $65,000
@@ -347,7 +361,7 @@ Condition: ABOVE
 Result: YES
 ```
 
-For a `BELOW` market:
+For a BELOW market:
 
 ```text
 Target:  $65,000
@@ -358,53 +372,180 @@ Condition: BELOW
 Result: YES
 ```
 
+The external data is therefore used to determine the result, while the resulting market state is committed to BOT Chain.
+
 ---
 
 # Evaluation Engine
 
-The evaluation engine lives in:
+The evaluator is located in:
 
 ```text
-veilmarket-tee/evaluator.js
+veyntmarket-tee/evaluator.js
 ```
 
-For the current demo it is executed through GitHub Actions.
+The current public prototype executes the evaluator through GitHub Actions.
 
-The evaluator performs the following sequence:
+The evaluator performs the following process:
 
 ```text
-1. Read market from contract
-        ↓
-2. Parse question
-        ↓
-3. Request FDC/Web2Json data
-        ↓
-4. Determine winning side
-        ↓
-5. Fetch bettors/predictions
-        ↓
-6. Decrypt YES/NO predictions
-        ↓
-7. Split bettors into winning/losing pools
-        ↓
-8. Calculate proportional payouts
-        ↓
-9. Create Merkle tree
-        ↓
-10. Generate winner proofs
-        ↓
-11. Sign marketId + MerkleRoot + outcome
-        ↓
-12. Call resolveMarket()
-        ↓
-13. Save payout data
+1. Read market from BOT Chain
+        |
+        v
+2. Read market configuration
+        |
+        v
+3. Request external data through FDC
+        |
+        v
+4. Determine the winning side
+        |
+        v
+5. Retrieve bettors from BOT Chain
+        |
+        v
+6. Retrieve encrypted predictions
+        |
+        v
+7. Decrypt YES / NO predictions
+        |
+        v
+8. Separate winning and losing bettors
+        |
+        v
+9. Calculate proportional payouts
+        |
+        v
+10. Build Merkle tree
+        |
+        v
+11. Generate individual winner proofs
+        |
+        v
+12. Sign resolution data
+        |
+        v
+13. Call resolveMarket() on BOT Chain
+        |
+        v
+14. Publish payout data
 ```
+
+---
+
+# Prediction Decryption
+
+The frontend uses the public prediction key to encrypt the prediction.
+
+The evaluator uses the corresponding private key to decrypt it.
+
+The two keys have completely different purposes.
+
+### Frontend
+
+```text
+PREDICTION_PUBLIC_KEY
+```
+
+Used for:
+
+```text
+YES / NO
+     |
+     v
+RSA-OAEP
+     |
+     v
+Encrypted prediction
+```
+
+### Evaluator
+
+```text
+PREDICTION_PRIVATE_KEY
+```
+
+Used to recover:
+
+```text
+Encrypted prediction
+     |
+     v
+RSA-OAEP / SHA-256
+     |
+     v
+YES / NO
+```
+
+The private key must never be included in the frontend.
+
+---
+
+# TEE Authorization
+
+The evaluator does not simply send an arbitrary outcome to the contract.
+
+The resolution is authorized through a trusted signing key.
+
+The evaluator constructs a resolution payload containing:
+
+```text
+marketId
+MerkleRoot
+winningOutcome
+```
+
+The payload is signed by the configured TEE signing key.
+
+Conceptually:
+
+```text
+Evaluator
+    |
+    ├── marketId
+    ├── MerkleRoot
+    └── outcome
+           |
+           v
+      Message Hash
+           |
+           v
+     Signing Key
+           |
+           v
+       Signature
+           |
+           v
+   resolveMarket()
+           |
+           v
+   Signature Verification
+           |
+       ┌───┴───┐
+       │       │
+      Valid   Invalid
+       │       │
+       v       v
+    Resolve   Revert
+```
+
+The smart contract verifies that the signer corresponds to the trusted signer configured in the contract.
+
+### Important Prototype Limitation
+
+The current implementation uses a trusted signing/decryption key boundary and executes the evaluator through GitHub Actions.
+
+This should not be described as a production hardware TEE.
+
+A hardened confidential-compute deployment with hardware-backed key protection remains part of the future roadmap.
 
 ---
 
 # Merkle-Based Payouts
 
-Instead of storing every user's payout directly in the contract, the evaluator creates a Merkle tree.
+Veynt does not need to store every winner's payout directly in the contract.
+
+Instead, the evaluator constructs a Merkle tree.
 
 Each winner becomes a leaf containing:
 
@@ -417,26 +558,18 @@ payout amount
 Conceptually:
 
 ```text
-Leaf =
-hash(walletAddress, payout)
+Leaf = hash(walletAddress, payout)
 ```
 
-The tree produces:
+The complete set of winner leaves produces:
 
 ```text
 Merkle Root
 ```
 
-Only the root is stored in the market contract.
+Only the root is stored on-chain.
 
-Example:
-
-```text
-Merkle Root:
-0x130905010a119e10127872011800327ba448494e1d0aba13fee2044e1f320cc7
-```
-
-The evaluator also generates an individual proof for each winner.
+The evaluator also produces an individual Merkle proof for each winner.
 
 Example claim data:
 
@@ -444,371 +577,465 @@ Example claim data:
 {
   "marketId": 5,
   "bettor": "0x...",
-  "payout": "12900000000000000000",
-  "proof": [
-    "0x..."
-  ]
+  "payout": "1000000000000000000",
+  "proof": ["0x..."]
 }
 ```
 
-This allows the contract to verify:
+The user can then submit the payout and Merkle proof to:
 
-> "This wallet + this payout is part of the Merkle tree authorized for this market."
-
-without storing every payout on-chain.
-
----
-
-# TEE Authorization
-
-The Merkle root alone does **not** authorize a market resolution.
-
-The evaluator creates:
-
-```text
-keccak256(
+```solidity
+claimPayout(
     marketId,
-    merkleRoot,
-    winningOutcome
+    payout,
+    merkleProof
 )
 ```
 
-The configured TEE signing account signs that hash.
-
-The contract recovers the signer and compares it with the trusted TEE signer configured in the contract.
-
-Conceptually:
+The contract verifies that:
 
 ```text
-Evaluator
-    │
-    ├── marketId
-    ├── merkleRoot
-    └── winningOutcome
-            │
-            ▼
-       message hash
-            │
-            ▼
-      TEE private key
-            │
-            ▼
-        signature
-            │
-            ▼
-      resolveMarket()
-            │
-            ▼
-    recover signer
-            │
-            ▼
-       trusted TEE?
-       /          \
-     YES           NO
-      │             │
-      ▼             ▼
- resolve         revert
+wallet + payout
 ```
 
-This prevents an arbitrary evaluator using a different private key from resolving the market.
+belongs to the Merkle tree authorized for that market.
 
 ---
 
-# Payout and Fee Distribution
+# Payout Model
 
-VeilMarket uses a parimutuel pool model. Once a market is resolved, the total market pool is distributed according to the following fixed allocation:
+Veynt uses a parimutuel pool model.
 
-| Allocation | Share | Recipient |
-|---|---:|---|
-| Winning bettors | 86% | Distributed proportionally among winning bettors |
-| Market creator | 10% | Creator of the market |
-| Platform | 3% | VeilMarket platform treasury |
-| Resolver | 1% | Account that submits the market resolution |
+The current implementation allocates the market pool as follows:
 
-The full pool is therefore allocated as:
+| Allocation      |    Share | Recipient                                        |
+| --------------- | -------: | ------------------------------------------------ |
+| Winning bettors |      86% | Distributed proportionally among winning bettors |
+| Market creator  |      10% | Creator of the market                            |
+| Platform        |       3% | Veynt treasury                                   |
+| Resolver        |       1% | Resolution submitter                             |
+| **Total**       | **100%** |                                                  |
+
+The winning allocation is distributed proportionally according to each winning bettor's stake.
+
+For example:
 
 ```text
-86%  Winning bettors
-10%  Market creator
- 3%  Platform
- 1%  Resolver
---------------------
-100% Total pool
+Total market pool = 15 BOT
 ```
 
-### Example
-
-For a market with a total pool of 15 FLR:
+The allocation is:
 
 ```text
-Winning bettors = 12.90 FLR
-Market creator  =  1.50 FLR
-Platform        =  0.45 FLR
-Resolver        =  0.15 FLR
+Winning bettors = 12.90 BOT
+Market creator  = 1.50 BOT
+Platform        = 0.45 BOT
+Resolver        = 0.15 BOT
 --------------------------------
-Total           = 15.00 FLR
+Total           = 15.00 BOT
 ```
 
-The 86% winning allocation is divided proportionally according to the stake of each winning bettor.
-
-For example, if the winning side contains:
+If the winning side contains:
 
 ```text
-Winner A = 8 FLR
-Winner B = 2 FLR
-
-Winning pool = 10 FLR
+Winner A = 8 BOT
+Winner B = 2 BOT
 ```
 
-then Winner A owns 80% of the winning pool and Winner B owns 20%.
-
-They therefore receive:
+then the winning pool is divided:
 
 ```text
-Winner A → 80% of 12.90 FLR = 10.32 FLR
-Winner B → 20% of 12.90 FLR =  2.58 FLR
+Winner A = 80%
+Winner B = 20%
 ```
 
-The market creator, platform, and resolver allocations are separate from the winning bettors' proportional allocation.
+Therefore:
+
+```text
+Winner A → 80% of 12.90 BOT = 10.32 BOT
+Winner B → 20% of 12.90 BOT =  2.58 BOT
+```
+
+All payout calculations are performed by the evaluator before the resulting Merkle root is submitted to the contract.
+
+---
 
 # Claiming Winnings
 
-After the market is resolved:
+After a market has been resolved:
 
 ```text
-Market
-  ↓
-Merkle root stored on-chain
-  ↓
-Evaluator generates payout JSON
-  ↓
-Payout JSON published to repository
-  ↓
-Frontend retrieves user's claim data
-  ↓
+Market resolved
+      |
+      v
+Merkle root stored on BOT Chain
+      |
+      v
+Evaluator generates payout data
+      |
+      v
+Payout JSON published
+      |
+      v
+Frontend retrieves claim data
+      |
+      v
 User clicks Claim
-  ↓
+      |
+      v
 claimPayout()
+      |
+      v
+Contract verifies Merkle proof
+      |
+      v
+BOT payout
 ```
 
-The contract reconstructs the leaf from:
+The contract verifies the supplied proof against the stored Merkle root.
 
-```text
-msg.sender
-+
-payout
-```
-
-and verifies the supplied Merkle proof against the stored root.
-
-A valid proof is required before the payout is released.
-
-The contract also prevents the same wallet from claiming the same market payout twice.
+A wallet cannot claim the same market payout more than once.
 
 ---
 
 # Emergency Refund
 
-If a market cannot be resolved, the contract provides an emergency refund path after the configured resolution grace period.
+The contract includes an emergency refund mechanism for markets that cannot be resolved normally.
 
-This is intended to prevent user funds from becoming permanently inaccessible because the external evaluation pipeline stopped functioning.
+If the configured resolution conditions and grace period are satisfied, participants can recover their stake according to the contract rules.
+
+This is intended to prevent funds from remaining permanently inaccessible if the external evaluation process fails.
 
 ---
 
-# Smart Contract API
+# Smart Contract
 
-The main contract is:
+The primary contract is:
 
 ```text
-VeilMarket.sol
+src/VeyntMarket.sol
 ```
 
-### Write functions
+The contract is responsible for:
 
-| Function | Purpose |
-|---|---|
-| `createMarket(...)` | Creates a new prediction market |
-| `predict(uint256, bytes)` | Places a stake with an encrypted prediction |
-| `resolveMarket(uint256, bytes32, string, bytes)` | Stores the authorized outcome and Merkle root |
-| `claimPayout(uint256, uint256, bytes32[])` | Claims a verified winner payout |
-| `emergencyRefund(uint256)` | Reclaims stake after the emergency-refund conditions are met |
-| `withdrawTreasury(address)` | Owner treasury withdrawal |
-| `transferOwnership(address)` | Transfers contract ownership |
+- Creating markets
+- Collecting the 1 BOT market creation fee
+- Accepting BOT stakes
+- Storing encrypted predictions
+- Tracking market state
+- Verifying authorized resolution signatures
+- Storing the Merkle root
+- Processing winner claims
+- Handling emergency refunds
+- Managing treasury functionality
 
-### Important view functions
+### Main Write Functions
 
-| Function | Purpose |
-|---|---|
-| `markets(uint256)` | Returns market information |
-| `stakeOf(uint256,address)` | Returns a user's stake |
-| `getPrediction(uint256,address)` | Returns the user's encrypted prediction |
-| `getBettors(uint256)` | Returns bettors associated with a market |
-| `marketCount()` | Returns the number of markets |
-| `getRequiredFee()` | Returns the current market-creation fee |
+| Function                                         | Purpose                                                        |
+| ------------------------------------------------ | -------------------------------------------------------------- |
+| `createMarket(...)`                              | Creates a new prediction market                                |
+| `predict(uint256, bytes)`                        | Places a BOT stake with an encrypted prediction                |
+| `resolveMarket(uint256, bytes32, string, bytes)` | Resolves a market using the authorized outcome and Merkle root |
+| `claimPayout(uint256, uint256, bytes32[])`       | Claims a verified winner payout                                |
+| `emergencyRefund(uint256)`                       | Recovers a stake when refund conditions are satisfied          |
+| `withdrawTreasury(address)`                      | Withdraws accumulated platform fees                            |
+| `transferOwnership(address)`                     | Transfers contract ownership                                   |
+
+### Important View Functions
+
+| Function                         | Purpose                                       |
+| -------------------------------- | --------------------------------------------- |
+| `markets(uint256)`               | Returns market information                    |
+| `marketCount()`                  | Returns the number of markets                 |
+| `stakeOf(uint256,address)`       | Returns a user's stake                        |
+| `getPrediction(uint256,address)` | Returns a user's encrypted prediction         |
+| `getBettors(uint256)`            | Returns bettors in a market                   |
+| `hasBet(uint256,address)`        | Checks whether a wallet has already predicted |
+| `hasClaimed(uint256,address)`    | Checks whether a wallet has claimed           |
+| `i_teeSigner()`                  | Returns the authorized resolution signer      |
+
+---
+
+# Market Creation Fee
+
+The current BOT Chain implementation uses a fixed creation fee:
+
+```text
+1 BOT
+```
+
+This is deliberately simple.
+
+The previous Flare implementation used an FTSO-derived native-token/USD conversion for determining the creation fee. That mechanism is no longer part of the BOT Chain implementation.
+
+The current model is:
+
+```text
+Create market
+     |
+     v
+Pay 1 BOT
+     |
+     v
+VeyntMarket
+     |
+     v
+Market created
+```
+
+This removes the need for a native BOT/USD oracle solely for calculating the market creation fee.
+
+External price data is instead used where it actually matters: resolving price-based prediction markets.
+
+---
+
+# FDC and BOT Chain: Separation of Responsibilities
+
+One of the main architectural changes in the BOT Chain version is the separation between external data retrieval and blockchain settlement.
+
+```text
+                  FDC / Flare
+                      |
+                      | External price data
+                      v
+                 Evaluator
+                      |
+                      | Outcome
+                      | Payouts
+                      | Merkle root
+                      | Signature
+                      v
+                  BOT Chain
+                      |
+                      v
+                VeyntMarket
+```
+
+### FDC
+
+Used for:
+
+- Retrieving supported external data
+- Obtaining price information
+- Providing an attested data source to the evaluator
+
+### Evaluator
+
+Used for:
+
+- Interpreting market conditions
+- Decrypting predictions
+- Determining the winning side
+- Calculating payouts
+- Building Merkle trees
+- Generating proofs
+- Signing the resolution payload
+
+### BOT Chain
+
+Used for:
+
+- Market creation
+- User staking
+- Encrypted prediction storage
+- Resolution
+- Merkle root storage
+- Payout claims
+- Treasury operations
+
+This separation keeps the market settlement logic on BOT Chain while allowing the resolution engine to consume externally sourced data.
+
+---
+
+# GitHub Actions Evaluation
+
+The current public prototype uses GitHub Actions as the evaluator execution layer.
+
+A typical workflow provides a market ID and executes:
+
+```bash
+node veyntmarket-tee/evaluator.js
+```
+
+The evaluator uses:
+
+```text
+BOT Chain RPC
++
+VeyntMarket contract
++
+FDC request
++
+Prediction private key
++
+Resolution signing key
+```
+
+The generated payout data is published under:
+
+```text
+veyntmarket-tee/payouts/
+```
+
+For example:
+
+```text
+veyntmarket-tee/payouts/market-1.json
+veyntmarket-tee/payouts/market-2.json
+```
+
+The frontend retrieves the relevant payout data after the market has been resolved.
 
 ---
 
 # Key Management
 
-There are two different cryptographic key purposes.
+Veynt currently uses separate keys for separate purposes.
 
-## TEE signing key
+## TEE / Resolution Signing Key
 
 ```text
 TEE_PRIVATE_KEY
 ```
 
-Used to:
+Used to authorize:
 
 ```text
-sign marketId + MerkleRoot + outcome
+marketId
++
+MerkleRoot
++
+winningOutcome
 ```
 
-The corresponding Ethereum address must match the trusted TEE signer configured in the deployed contract.
-
-## Prediction decryption key
-
-```text
-PREDICTION_PRIVATE_KEY
-```
-
-Used to decrypt RSA-OAEP encrypted YES/NO predictions.
-
-This key must **never** be exposed in:
-
-- frontend JavaScript
-- `index.html`
-- browser storage
-- public GitHub files
-- transaction calldata
-- logs
-
-For the demo, both secrets are injected into GitHub Actions as repository secrets.
+The corresponding address must match the trusted signer configured in the deployed contract.
 
 ---
 
-# GitHub Actions Resolution
-
-The demo uses a manually triggered GitHub workflow:
+## Prediction Decryption Key
 
 ```text
-.github/workflows/fdc-full-run.yml
-```
-
-The workflow accepts:
-
-```text
-market_id
-```
-
-and runs:
-
-```bash
-node veilmarket-tee/evaluator.js
-```
-
-The required secrets include:
-
-```text
-PRIVATE_KEY
-TEE_PRIVATE_KEY
 PREDICTION_PRIVATE_KEY
-VEIL_MARKET_ADDRESS
 ```
 
-After evaluation, the workflow publishes:
+Used to decrypt the RSA-OAEP encrypted YES/NO predictions.
 
-```text
-veilmarket-tee/payouts/market-X.json
-```
+This key must never be exposed through:
 
-back to the repository.
+- Frontend JavaScript
+- `index.html`
+- Browser storage
+- Public repositories
+- Transaction calldata
+- Client-side logs
 
-The frontend can then retrieve the payout data and construct the claim transaction.
+For the current prototype, the secret is supplied to the evaluator environment.
 
 ---
 
 # Frontend
 
-The current demo frontend is a lightweight HTML/JavaScript application.
+The current Veynt frontend is a lightweight HTML/JavaScript application.
 
-Live:
+Live application:
 
-https://veilmarket.adarshpandey.xyz
+https://veyntmarket.adarshpandey.xyz/
 
 The interface provides:
 
-- wallet connection
-- market cards
-- market creation
-- BTC price market creation
+- Wallet connection
+- Market discovery
+- Market creation
+- BOT staking
 - YES/NO prediction
-- stake input
-- deadline countdown
-- resolution controls
-- claim controls
-- transaction status
-- wallet-aware payout claiming
+- Client-side prediction encryption
+- Market deadlines
+- Market resolution information
+- Payout information
+- Merkle-proof-based claiming
+- Transaction status
 
-The frontend deliberately hides evaluator infrastructure such as:
+The frontend does not expose evaluator internals such as:
 
 - FDC request construction
-- API endpoint configuration
+- Prediction decryption
 - TEE signing
-- GitHub workflow internals
 - Merkle tree generation
+- GitHub Actions execution
 
-Those are evaluation/settlement concerns rather than user-facing market configuration.
+Those operations belong to the evaluation and settlement layer.
 
 ---
 
-# Current Demo Example
+# Example Market
 
-A typical market can be created as:
-
-```text
-Will the price of BTC be above $65,000 after 5 minutes?
-```
-
-Internally:
+A market could look like:
 
 ```text
-BTC|ABOVE|6500000000000
+Will BTC be above $65,000 at the market deadline?
 ```
 
-Users may then submit:
+A user chooses:
 
 ```text
 YES
 ```
 
-or:
+The frontend encrypts the prediction:
+
+```text
+YES
+  |
+  v
+RSA-OAEP / SHA-256
+  |
+  v
+Encrypted ciphertext
+  |
+  v
+BOT Chain
+```
+
+Another user could choose:
 
 ```text
 NO
 ```
 
-with a FLR stake.
+without the first user's prediction direction being directly visible on-chain.
 
-At expiry:
+At the deadline:
 
 ```text
-FDC → BTC price
-       ↓
-Evaluator → winning side
-       ↓
-Decrypt predictions
-       ↓
-Calculate winning pool
-       ↓
-Calculate payouts
-       ↓
+FDC
+ |
+ | Verified external price
+ v
+Evaluator
+ |
+ | Compare price against condition
+ v
+Winning side
+ |
+ | Decrypt encrypted predictions
+ v
+Winning bettors
+ |
+ | Calculate proportional payouts
+ v
 Merkle tree
-       ↓
+ |
+ | Generate Merkle root
+ v
 TEE signature
-       ↓
+ |
+ v
+BOT Chain
+ |
+ v
 resolveMarket()
-       ↓
+ |
+ v
 Winner claims payout
 ```
 
@@ -817,18 +1044,18 @@ Winner claims payout
 # Repository Structure
 
 ```text
-VeilMarket/
+VEYNT/
 │
-├── contracts/
-│   └── VeilMarket.sol
+├── src/
+│   └── VeyntMarket.sol
 │
 ├── script/
-│   └── DeployVeilMarket.s.sol
+│   └── DeployVeyntMarket.s.sol
 │
 ├── test/
-│   └── VeilMarket.t.sol
+│   └── VeyntMarket.t.sol
 │
-├── veilmarket-tee/
+├── veyntmarket-tee/
 │   ├── evaluator.js
 │   ├── fdc-run.js
 │   ├── constants.js
@@ -839,7 +1066,7 @@ VeilMarket/
 │
 ├── .github/
 │   └── workflows/
-│       └── fdc-full-run.yml
+│       └── ...
 │
 ├── index.html
 ├── foundry.toml
@@ -858,27 +1085,28 @@ Install:
 - Node.js 20+
 - Foundry
 - Git
-- A Coston2-compatible wallet
-- Coston2 testnet FLR for testing
+- A BOT Chain-compatible wallet
+
+The evaluator additionally requires the configured environment variables/secrets used by the project.
 
 ---
 
 ## Clone
 
 ```bash
-git clone https://github.com/Pandey456/VeilMarket.git
-cd VeilMarket
+git clone https://github.com/Pandey456/VEYNT.git
+cd VEYNT
 ```
 
 ---
 
-## Install Node dependencies
+## Install Dependencies
 
 ```bash
 npm install
 ```
 
-The evaluator currently relies on packages including:
+The evaluator uses packages including:
 
 ```text
 viem
@@ -887,7 +1115,7 @@ viem
 
 ---
 
-## Build Solidity contracts
+## Build Contracts
 
 ```bash
 forge build
@@ -895,7 +1123,7 @@ forge build
 
 ---
 
-## Run tests
+## Run Tests
 
 ```bash
 forge test -vvv
@@ -903,30 +1131,25 @@ forge test -vvv
 
 ---
 
-# Flare Coston2
+# BOT Chain
 
-The current demo runs on:
+Veynt's current market contract is deployed for the BOT Chain testnet environment.
 
-```text
-Flare Coston2
-Chain ID: 114
-```
-
-RPC:
+RPC used by the current evaluator and deployment flow:
 
 ```text
-https://coston2-api.flare.network/ext/C/rpc
+https://rpc.bohr.life
 ```
 
-The project is intentionally deployed to testnet while the architecture is being validated.
+The exact deployed contract address should be taken from the project's current deployment configuration rather than hard-coded into this README.
 
 ---
 
-# Transparency vs Confidentiality
+# Transparency and Confidentiality
 
-VeilMarket does not attempt to hide everything.
+Veynt deliberately separates information into two categories.
 
-### Public
+## Public
 
 ```text
 Wallet address
@@ -935,251 +1158,298 @@ Market ID
 Transaction
 Encrypted prediction
 Deadline
-Market outcome after resolution
+Contract state
+Resolution
 Merkle root
 Claim transaction
 ```
 
-### Confidential before resolution
+## Confidential Before Resolution
 
 ```text
 YES / NO prediction
 ```
 
-The core objective is therefore not:
+The system therefore does not attempt to hide the fact that someone participated.
 
-> "Make the entire prediction market invisible."
+It attempts to hide **which side they selected**.
 
-It is:
-
-> **"Prevent other market participants from seeing which side you selected before resolution."**
+This distinction is fundamental to the design.
 
 ---
 
 # Security Considerations
 
-### Prediction encryption
+## Prediction Encryption
 
-The RSA private decryption key must remain secret.
-
-If:
+The security of prediction confidentiality depends on protecting:
 
 ```text
 PREDICTION_PRIVATE_KEY
 ```
 
-is compromised, encrypted predictions can be decrypted.
+If the private decryption key is compromised, previously stored encrypted predictions may be decrypted.
 
-### TEE signing authority
+---
 
-The TEE signing key is the authorization mechanism for `resolveMarket()`.
+## Resolution Signing Key
 
-A compromised TEE signing key could potentially authorize a malicious resolution.
+The resolution signing key is trusted by the smart contract.
 
-### GitHub Actions
+A compromised signing key could potentially authorize an incorrect market resolution.
 
-The current demo uses GitHub Actions as the evaluator execution environment.
+This is one of the most important security boundaries in the current prototype.
 
-This is convenient for a public prototype but is not equivalent to a hardened production confidential-compute deployment.
+---
 
-### Merkle payouts
+## Evaluator Environment
 
-The Merkle root commits the evaluator's payout set.
+The current evaluator runs through GitHub Actions.
 
-Users can independently verify that their:
+This is suitable for demonstrating the architecture and automating the public testnet workflow, but it should not be treated as equivalent to a hardened production confidential-computing environment.
 
-```text
-address + payout
-```
+A future version should move sensitive evaluation and key operations into a stronger confidential-compute environment with hardware-backed key protection.
 
-matches the root through their Merkle proof.
+---
 
-### Smart contract
+## FDC Dependency
 
-The contract has not been independently audited.
+For price-based markets, the evaluator depends on the FDC flow to obtain the external data required for resolution.
 
-**Do not use this deployment for real funds.**
+If the external data pipeline or evaluation process fails, the market must rely on the contract's emergency-refund conditions rather than silently assuming an outcome.
+
+---
+
+## Smart Contract
+
+The smart contracts have not been independently audited.
+
+This project is a testnet prototype.
+
+Do not use this deployment with funds you cannot afford to lose.
 
 ---
 
 # Known Prototype Limitations
 
-1. **GitHub Actions is currently the evaluator execution layer.**
-2. **The TEE architecture is represented by a trusted signing/decryption key boundary; a production hardware-enclave deployment is still a future step.**
-3. **The FDC result is consumed by the evaluator before the signed resolution is submitted.**
-4. **The frontend is intentionally lightweight and currently implemented as HTML/JavaScript.**
-5. **The system is running on Flare Coston2 testnet.**
-6. **No independent security audit has been completed.**
-7. **The current demo focuses on binary YES/NO prediction markets.**
-8. **BTC is currently the primary supported asset in the frontend market builder.**
+1. The evaluator currently runs through GitHub Actions.
+2. Sensitive evaluator keys are supplied through the evaluator environment.
+3. The current key boundary should not be described as a production hardware TEE.
+4. FDC data is consumed by the evaluator before the resulting resolution is submitted to BOT Chain.
+5. The current frontend is implemented as HTML/JavaScript.
+6. The smart contract has not undergone an independent security audit.
+7. The current market model focuses on binary YES/NO outcomes.
+8. Price-based markets currently depend on the supported FDC data flow.
+9. The current market creation fee is fixed at 1 BOT.
+10. The current implementation is intended for testnet experimentation rather than production financial use.
 
 ---
 
 # Roadmap
 
+The current architecture is intentionally designed so that additional market types and data sources can be added without fundamentally changing the settlement model.
+
 ## Phase 1 — Core Market
 
-- [x] Parimutuel pool
+- [x] Parimutuel prediction pool
 - [x] Market creation
-- [x] FLR staking
+- [x] Fixed 1 BOT market creation fee
+- [x] BOT staking
 - [x] Deadline enforcement
 - [x] One prediction per wallet
 - [x] Emergency refund
-- [x] Owner/treasury functionality
+- [x] Owner and treasury functionality
 
 ## Phase 2 — Confidential Predictions
 
 - [x] Client-side encryption
-- [x] RSA-OAEP prediction ciphertext
-- [x] Encrypted prediction stored on-chain
+- [x] RSA-OAEP prediction encryption
+- [x] Encrypted predictions stored on-chain
 - [x] Evaluator-side decryption
-- [x] Prediction direction hidden from block explorers
+- [x] Prediction direction hidden from block explorers before resolution
 
-## Phase 3 — Verifiable Resolution
+## Phase 3 — External Data Resolution
 
-- [x] FDC Web2Json request
-- [x] Binance BTC price retrieval
-- [x] Deadline-based price query
+- [x] FDC integration
+- [x] External price retrieval
+- [x] Deadline-based evaluation
 - [x] Winning-side calculation
-- [x] TEE authorization signature
-- [x] On-chain signature verification
+- [x] Authorized resolution signature
+- [x] On-chain resolution on BOT Chain
 
-## Phase 4 — Payouts
+## Phase 4 — Verifiable Payouts
 
 - [x] Winning pool calculation
-- [x] Pro-rata payout calculation
+- [x] Proportional payout calculation
 - [x] Merkle tree generation
 - [x] Merkle proof generation
 - [x] On-chain Merkle root
-- [x] Claim payout
-- [x] Claim protection against duplicate claims
-- [x] Payout JSON publication
+- [x] Claim verification
+- [x] Duplicate-claim protection
+- [x] Payout JSON generation
 
 ## Phase 5 — Production Hardening
 
-- [ ] Deploy evaluator inside a hardened confidential-compute environment
+- [ ] Move evaluation into a hardened confidential-compute environment
 - [ ] Hardware-backed key management
-- [ ] Remove GitHub Actions as the trust boundary
+- [ ] Remove GitHub Actions as the sensitive evaluation trust boundary
 - [ ] Independent smart-contract audit
-- [ ] Formalize FDC proof verification architecture
-- [ ] Improve decentralized resolution/keeper model
+- [ ] Strengthen FDC verification architecture
+- [ ] Improve evaluator reliability and failure recovery
+- [ ] Improve decentralized keeper/resolution infrastructure
 - [ ] Add additional asset feeds
-- [ ] Add sports and real-world event resolution
-- [ ] Improve monitoring and failure recovery
+- [ ] Add sports and real-world event markets
+- [ ] Improve monitoring and observability
 - [ ] Mainnet deployment
+
+---
+
+# Future Scope
+
+The current prototype focuses primarily on crypto price prediction markets. The longer-term goal is to turn the same settlement architecture into a more general prediction-market platform.
+
+## 1. More Assets and Real-World Markets
+
+The market engine can be extended beyond a single price feed.
+
+Potential future categories include:
+
+- Additional cryptocurrencies
+- Token price markets
+- Traditional financial assets
+- Sports outcomes
+- Event-based markets
+- Other real-world events that can be resolved using verifiable external data
+
+The goal is to make the market definition flexible enough that the settlement engine is not tightly coupled to a single asset or API.
+
+---
+
+## 2. Yield Generation for Long-Duration Markets
+
+For markets with sufficiently long deadlines, idle capital could potentially be deployed into supported lending protocols rather than remaining unused for the entire market duration.
+
+A possible future model is:
+
+```text
+Users place predictions
+        |
+        v
+Market pool accumulates
+        |
+        v
+Long-duration market
+        |
+        v
+Capital deployed into supported lending protocol
+        |
+        v
+Yield generated during market duration
+        |
+        v
+Market reaches deadline
+        |
+        v
+Market resolved
+        |
+        v
+Principal returned
+        |
+        v
+Generated yield distributed according
+to the future market rules
+```
+
+This feature is not part of the current implementation.
+
+It would require careful consideration of liquidity, protocol risk, withdrawal timing, accounting, and how yield interacts with the existing payout model.
 
 ---
 
 # Design Principles
 
-### 1. Hide the decision, not the transaction
+## 1. Hide the Decision, Not the Transaction
 
-The blockchain should still provide transparent evidence that a bet happened.
+The blockchain should still provide transparent evidence that a market position exists.
 
-### 2. Don't store unnecessary payout state on-chain
+The prediction direction is the information Veynt attempts to keep confidential until evaluation.
 
-Merkle proofs allow the contract to commit to a complete payout set using a single root.
+---
 
-### 3. Separate truth from settlement
+## 2. Keep Settlement Verifiable
 
-FDC provides external data.
+The evaluator can perform complex processing off-chain, but the final market resolution still produces an on-chain state.
 
-The evaluator interprets that data and constructs the payout state.
+The Merkle root provides a compact commitment to the payout set.
 
-The contract verifies that the authorized evaluator signed the resulting resolution.
+---
 
-### 4. Keep private keys outside the client
+## 3. Separate External Data From Settlement
 
-The browser gets the public encryption key.
+FDC is responsible for providing the external data required by supported markets.
 
-Private decryption/signing keys stay in the evaluator environment.
+The evaluator interprets that data.
+
+BOT Chain records the resulting market resolution.
+
+This separation makes it easier to evolve the data layer without redesigning the core market contract.
+
+---
+
+## 4. Keep Private Keys Outside the Client
+
+The browser only needs the public encryption key.
+
+Sensitive decryption and signing keys remain outside the frontend.
+
+---
+
+## 5. Minimize On-Chain Payout State
+
+Instead of storing every winner's payout directly in the contract, the evaluator commits to the payout set using a Merkle root.
+
+Users prove their individual allocation when claiming.
+
+---
+
+# Why Veynt?
+
+Prediction markets benefit from transparency, but complete transparency can also expose participant behavior too early.
+
+Veynt explores a middle ground:
+
+```text
+Transparent settlement
++
+Encrypted prediction direction
++
+Externally sourced data
++
+Off-chain evaluation
++
+Authorized resolution
++
+Merkle-based claims
+```
+
+The result is a prediction-market architecture where participants can interact with a public blockchain without immediately broadcasting which side they selected.
 
 ---
 
 # Build in Public
 
-VeilMarket is being developed publicly.
+Veynt is being developed as an open project.
 
-Development updates, experiments, debugging sessions, and architecture decisions are shared on X:
+The repository contains the smart contracts, evaluator, FDC integration, payout generation, and frontend components required to understand the current implementation.
 
-**[@pandeyy456](https://x.com/pandeyy456)**
+Repository:
 
-The goal is to document the process of taking a confidential prediction-market idea from a smart-contract prototype to a working end-to-end testnet application.
+https://github.com/Pandey456/VEYNT
 
----
+Live application:
 
-# About the Name
+https://veyntmarket.adarshpandey.xyz/
 
-The project currently uses **VeilMarket** because that is the repository and deployed prototype name.
-
-However, the name is not ideal for a long-term product brand.
-
-There are already other projects/products using closely related names, including prediction-market projects using **VEIL**, so a future rename would reduce brand confusion.
-
-For the **hackathon/demo stage**, I recommend keeping:
-
-```text
-VeilMarket
-```
-
-to avoid unnecessary migration work.
-
-Before a public production launch, the project should choose a more distinctive name and migrate:
-
-- repository
-- contract naming where appropriate
-- frontend branding
-- domain/subdomain
-- social handles
-- documentation
-
----
-# Future Scope
-
-The current prototype focuses on BTC price prediction markets. The next stage of development will expand the platform beyond a single asset and introduce additional utility for longer-duration markets.
-
-## 1. Expanded Assets and Real-World Markets
-
-The platform will be expanded to support prediction markets across a broader range of assets and real-world events.
-
-Planned categories include:
-
-- Additional cryptocurrencies and token price markets
-- Traditional financial assets
-- Sports and event-based outcomes
-- Other real-world scenarios that can be resolved using verifiable external data
-
-The goal is to make the market creation system flexible enough that a market can be created around any supported event or data source, rather than being limited to BTC price predictions.
-
-## 2. Yield Generation for Long-Duration Markets
-
-For markets with a deadline longer than 15 days, the capital accumulated in the market will have an additional use during the waiting period.
-
-Instead of leaving the prediction pool idle, the accumulated funds may be deployed into supported lending protocols to generate yield.
-
-The intended flow is:
-
-```text
-Users place predictions
-        ↓
-Market pool accumulates
-        ↓
-Deadline > 15 days
-        ↓
-Pool is deployed into supported lending protocols
-        ↓
-Yield is generated during the market duration
-        ↓
-Market reaches its deadline
-        ↓
-Market is resolved
-        ↓
-Principal is returned to the market
-        ↓
-Generated yield is distributed among
-the participants of that market
-
-```
 ---
 
 # License
@@ -1188,10 +1458,10 @@ Licensed under the MIT License.
 
 ---
 
-## Built on Flare Coston2
+## Built for BOT Chain
 
-**Built in public by Adarsh Pandey.**
+Veynt is an experimental prediction-market architecture built around BOT Chain settlement and Flare Data Connector-powered external data resolution.
 
-The current objective is simple:
+The current objective is straightforward:
 
-> **Make prediction markets less predictable from the outside.**
+> **Keep the prediction private. Keep the settlement verifiable.**
