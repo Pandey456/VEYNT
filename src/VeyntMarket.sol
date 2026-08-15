@@ -48,6 +48,21 @@ contract VeyntMarket {
     /// @notice Fixed market creation fee: 1 BOT
     uint256 public constant MARKET_CREATION_FEE = 1 ether;
 
+    /// @notice Winner allocation: 86% of the market pool.
+    uint256 public constant WINNER_SHARE = 86;
+
+    /// @notice Market creator allocation: 10% of the market pool.
+    uint256 public constant CREATOR_SHARE = 10;
+
+    /// @notice Veynt treasury allocation: 3% of the market pool.
+    uint256 public constant PLATFORM_SHARE = 3;
+
+    /// @notice Resolver allocation: 1% of the market pool.
+    uint256 public constant RESOLVER_SHARE = 1;
+
+    /// @notice Total allocation percentage.
+    uint256 public constant TOTAL_SHARE = 100;
+
     /// @notice Minimum time a market must remain open.
     uint256 public constant MIN_MARKET_DURATION = 5 minutes;
 
@@ -395,7 +410,7 @@ contract VeyntMarket {
 
         bytes32 outcomeHash = keccak256(bytes(_outcome));
 
-        bool outcome;
+        bool outcome = false;
 
         if (outcomeHash == keccak256(bytes("YES"))) {
             outcome = true;
@@ -432,6 +447,48 @@ contract VeyntMarket {
 
         if (recoveredSigner != i_teeSigner) {
             revert NotOwner();
+        }
+
+        // --------------------------------------------------------
+        // CALCULATE MARKET ALLOCATION
+        // --------------------------------------------------------
+
+        uint256 totalPool = market.totalPool;
+
+        uint256 creatorAmount = (totalPool * CREATOR_SHARE) / TOTAL_SHARE;
+
+        uint256 platformAmount = (totalPool * PLATFORM_SHARE) / TOTAL_SHARE;
+
+        uint256 resolverAmount = (totalPool * RESOLVER_SHARE) / TOTAL_SHARE;
+
+        // --------------------------------------------------------
+        // ACCOUNT FOR PLATFORM SHARE
+        // --------------------------------------------------------
+
+        accumulatedTreasuryFees += platformAmount;
+
+        // --------------------------------------------------------
+        // PAY MARKET CREATOR
+        // --------------------------------------------------------
+
+        (bool creatorSuccess, ) = payable(market.owner).call{
+            value: creatorAmount
+        }("");
+
+        if (!creatorSuccess) {
+            revert TransferFailed();
+        }
+
+        // --------------------------------------------------------
+        // PAY RESOLVER
+        // --------------------------------------------------------
+
+        (bool resolverSuccess, ) = payable(msg.sender).call{
+            value: resolverAmount
+        }("");
+
+        if (!resolverSuccess) {
+            revert TransferFailed();
         }
 
         // --------------------------------------------------------
