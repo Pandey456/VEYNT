@@ -7,9 +7,6 @@ if (!VEYNT_MARKET_ADDRESS) {
 }
 // constants.js
 
-// const VEYNT_MARKET_ADDRESS =
-//   "0xae1cf56E2Df39E4EE9203DcEd781C75799E36202";
-
 const VEYNT_MARKET_ABI = [
   {
     type: "function",
