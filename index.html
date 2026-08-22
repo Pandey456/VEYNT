@@ -500,7 +500,7 @@
           <div class="logo">V</div>
           <div>
             <h1>Veynt</h1>
-            <p>Prediction markets · BOT Chain Testnet</p>
+            <p>Prediction markets · BOT Chain Mainnet</p>
           </div>
         </div>
         <button class="wallet" id="connectBtn">Connect Wallet</button>
@@ -635,17 +635,23 @@
         formatEther,
       } from "https://esm.sh/viem@2.55.11";
 
-      const botChainTestnet = defineChain({
-        id: 968,
-        name: "BOT Chain Testnet",
-        nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
+      const botChainMainnet = defineChain({
+        id: 677,
+        name: "BOT Chain",
+        nativeCurrency: {
+          name: "BOT",
+          symbol: "BOT",
+          decimals: 18,
+        },
         rpcUrls: {
-          default: { http: ["https://rpc.bohr.life"] },
+          default: {
+            http: ["https://rpc.botchain.ai"],
+          },
         },
         blockExplorers: {
           default: {
             name: "BOTScan",
-            url: "https://scan.bohr.life",
+            url: "https://scan.botchain.ai",
           },
         },
       });
@@ -774,7 +780,7 @@ twIDAQAB
 
       const ZERO = "0x0000000000000000000000000000000000000000";
 
-      const BOT_CHAIN_ID_HEX = "0x3c8";
+      const BOT_CHAIN_ID_HEX = "0x2a5";
 
       const $ = (id) => document.getElementById(id);
 
@@ -806,14 +812,14 @@ twIDAQAB
             params: [
               {
                 chainId: BOT_CHAIN_ID_HEX,
-                chainName: "BOT Chain Testnet",
+                chainName: "BOT Chain",
                 nativeCurrency: {
                   name: "BOT",
                   symbol: "BOT",
                   decimals: 18,
                 },
-                rpcUrls: ["https://rpc.bohr.life"],
-                blockExplorerUrls: ["https://scan.bohr.life"],
+                rpcUrls: ["https://rpc.botchain.ai"],
+                blockExplorerUrls: ["https://scan.botchain.ai"],
               },
             ],
           });
@@ -878,7 +884,7 @@ twIDAQAB
           await ensureBotChain();
 
           provider = createWalletClient({
-            chain: botChainTestnet,
+            chain: botChainMainnet,
             transport: custom(window.ethereum),
           }).extend(publicActions);
 
