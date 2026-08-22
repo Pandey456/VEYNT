@@ -1,3 +1,7 @@
+******************************************************************************************
+this file is backup of working copy of evaluator.js on test net , in the file evaluator.js We 
+have configured it from test net to mainnet
+*******************************************************************************************
 const crypto = require("crypto");
 const {
   createPublicClient,
@@ -11,23 +15,17 @@ const {
 } = require("viem");
 
 const { privateKeyToAccount } = require("viem/accounts");
-const botChainMainnet = defineChain({
-  id: 677,
-  name: "BOT Chain",
-  nativeCurrency: {
-    name: "BOT",
-    symbol: "BOT",
-    decimals: 18,
-  },
+const botChainTestnet = defineChain({
+  id: 968,
+  name: "BOT Chain Testnet",
+  nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
   rpcUrls: {
-    default: {
-      http: ["https://rpc.botchain.ai"],
-    },
+    default: { http: ["https://rpc.bohr.life"] },
   },
   blockExplorers: {
     default: {
       name: "BOTScan",
-      url: "https://scan.botchain.ai",
+      url: "https://scan.bohr.life",
     },
   },
 });
@@ -65,7 +63,7 @@ if (!VEYNT_MARKET_ADDRESS) {
   throw new Error("FATAL: VEYNT_MARKET_ADDRESS is missing.");
 }
 
-const RPC_URL = "https://rpc.botchain.ai";
+const RPC_URL = "https://rpc.bohr.life";
 
 // ============================================================
 // ACCOUNTS
@@ -84,13 +82,13 @@ const teeAccount = privateKeyToAccount(process.env.TEE_PRIVATE_KEY);
 // ============================================================
 
 const publicClient = createPublicClient({
-  chain: botChainMainnet,
+  chain: botChainTestnet,
   transport: http(RPC_URL),
 });
 
 const walletClient = createWalletClient({
   account: deployerAccount,
-  chain: botChainMainnet,
+  chain: botChainTestnet,
   transport: http(RPC_URL),
 });
 
@@ -886,3 +884,4 @@ runProductionEvaluator().catch((error) => {
 
   process.exit(1);
 });
+
