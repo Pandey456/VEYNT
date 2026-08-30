@@ -1,0 +1,1580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Veynt — Prediction Markets on BOT</title>
+
+    <style>
+      :root {
+        --bg: #080808;
+        --panel: #111111;
+        --panel2: #171717;
+        --border: rgba(255, 210, 0, 0.14);
+        --text: #f7f7f2;
+        --muted: #9b9b91;
+        --green: #35e59a;
+        --red: #ff5f6d;
+        --yellow: #ffd400;
+        --blue: #8fa7ff;
+        --black: #080808;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background:
+          radial-gradient(
+            circle at 10% 0%,
+            rgba(255, 212, 0, 0.12),
+            transparent 30%
+          ),
+          radial-gradient(
+            circle at 90% 0%,
+            rgba(255, 212, 0, 0.07),
+            transparent 28%
+          ),
+          var(--bg);
+        color: var(--text);
+        font-family:
+          Inter,
+          system-ui,
+          -apple-system,
+          Segoe UI,
+          sans-serif;
+      }
+      button,
+      input,
+      select {
+        font: inherit;
+      }
+      .app {
+        width: min(1180px, calc(100% - 32px));
+        margin: auto;
+        padding: 24px 0 70px;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 0 42px;
+      }
+      .brand {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+      .logo {
+        width: 40px;
+        height: 40px;
+        border-radius: 13px;
+        display: grid;
+        place-items: center;
+        background: linear-gradient(135deg, var(--yellow), #fff1a3);
+        color: #080808;
+        font-weight: 900;
+      }
+      .brand h1 {
+        margin: 0;
+        font-size: 20px;
+        letter-spacing: -0.04em;
+      }
+      .brand p {
+        margin: 3px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .wallet {
+        border: 1px solid var(--border);
+        background: #151c27;
+        color: var(--text);
+        padding: 11px 16px;
+        border-radius: 12px;
+        font-weight: 800;
+        cursor: pointer;
+      }
+      .wallet.connected {
+        background: var(--yellow);
+        color: #080808;
+      }
+      .hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: end;
+        gap: 25px;
+        margin-bottom: 28px;
+      }
+      .hero h2 {
+        font-size: clamp(38px, 6vw, 66px);
+        line-height: 0.94;
+        letter-spacing: -0.07em;
+        margin: 0;
+      }
+      .hero h2 span {
+        color: var(--yellow);
+      }
+      .hero p {
+        max-width: 650px;
+        color: var(--muted);
+        line-height: 1.6;
+        margin: 17px 0 0;
+      }
+      .primary,
+      .ghost,
+      .yes,
+      .no,
+      .resolve,
+      .claim {
+        border-radius: 11px;
+        padding: 12px 16px;
+        font-weight: 850;
+        cursor: pointer;
+        border: 1px solid transparent;
+        transition: 0.2s;
+      }
+      .primary {
+        background: var(--yellow);
+        color: #080808;
+      }
+      .primary:hover,
+      .claim:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.04);
+      }
+      .ghost {
+        background: #151c27;
+        color: var(--text);
+        border-color: var(--border);
+      }
+      .toolbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin: 25px 0 14px;
+      }
+      .toolbar h3 {
+        margin: 0;
+      }
+      .toolbar small {
+        color: var(--muted);
+      }
+      .markets {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 18px;
+      }
+      .empty {
+        grid-column: 1/-1;
+        border: 1px dashed var(--border);
+        border-radius: 22px;
+        padding: 70px 20px;
+        text-align: center;
+        color: var(--muted);
+      }
+      .card {
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.035),
+          rgba(255, 255, 255, 0.015)
+        );
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        padding: 22px;
+        box-shadow: 0 22px 65px rgba(0, 0, 0, 0.3);
+      }
+      .top {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .id {
+        font-size: 11px;
+        color: var(--muted);
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+      .badge {
+        font-size: 10px;
+        font-weight: 900;
+        padding: 6px 9px;
+        border-radius: 99px;
+        color: var(--yellow);
+        background: rgba(255, 212, 0, 0.08);
+        border: 1px solid rgba(255, 212, 0, 0.18);
+      }
+      .badge.ready {
+        color: var(--yellow);
+        background: rgba(245, 196, 81, 0.08);
+        border-color: rgba(245, 196, 81, 0.18);
+      }
+      .badge.resolved {
+        color: var(--blue);
+        background: rgba(112, 167, 255, 0.08);
+        border-color: rgba(112, 167, 255, 0.18);
+      }
+      .question {
+        font-size: 22px;
+        line-height: 1.25;
+        letter-spacing: -0.025em;
+        margin: 20px 0;
+      }
+      .meta {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .meta div {
+        padding: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .meta small {
+        display: block;
+        color: var(--muted);
+        font-size: 10px;
+        margin-bottom: 5px;
+      }
+      .meta strong {
+        font-size: 12px;
+      }
+      .timer {
+        color: var(--muted);
+        font-size: 12px;
+        margin: 14px 0;
+      }
+      .bet {
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 8px;
+      }
+      .amount,
+      .field input,
+      .field select {
+        width: 100%;
+        background: #090d13;
+        color: var(--text);
+        border: 1px solid var(--border);
+        border-radius: 11px;
+        padding: 12px;
+        outline: none;
+      }
+      .amount:focus,
+      .field input:focus,
+      .field select:focus {
+        border-color: rgba(255, 212, 0, 0.5);
+      }
+      .yes {
+        color: var(--yellow);
+        background: rgba(255, 212, 0, 0.1);
+        border-color: rgba(255, 212, 0, 0.22);
+      }
+      .no {
+        color: var(--red);
+        background: rgba(255, 95, 109, 0.08);
+        border-color: rgba(255, 95, 109, 0.2);
+      }
+      .resolve {
+        color: var(--yellow);
+        background: rgba(245, 196, 81, 0.08);
+        border-color: rgba(245, 196, 81, 0.2);
+      }
+      .claim {
+        background: var(--yellow);
+        color: #080808;
+      }
+      .row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding-top: 13px;
+        margin-top: 13px;
+      }
+      .note {
+        font-size: 11px;
+        color: var(--muted);
+      }
+      button:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+        transform: none !important;
+      }
+      .modal-bg {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(9px);
+        display: none;
+        place-items: center;
+        padding: 20px;
+        z-index: 20;
+      }
+      .modal-bg.open {
+        display: grid;
+      }
+      .modal {
+        width: min(560px, 100%);
+        background: #0e131b;
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        padding: 24px;
+        box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
+      }
+      .modal-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 15px;
+      }
+      .modal h3 {
+        margin: 0;
+        font-size: 24px;
+      }
+      .modal p {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .close {
+        border: 0;
+        background: none;
+        color: var(--muted);
+        font-size: 25px;
+        cursor: pointer;
+      }
+      .field {
+        margin: 14px 0;
+      }
+      .field label {
+        display: block;
+        font-size: 12px;
+        color: #bbc4d0;
+        margin-bottom: 7px;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 9px;
+        margin-top: 20px;
+      }
+      .toast {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        width: min(390px, calc(100% - 40px));
+        background: #131b26;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: none;
+        z-index: 30;
+        font-size: 13px;
+      }
+      .toast.show {
+        display: block;
+      }
+      @media (max-width: 850px) {
+        .markets {
+          grid-template-columns: 1fr;
+        }
+        .hero {
+          flex-direction: column;
+          align-items: start;
+        }
+        .hero .primary {
+          width: 100%;
+        }
+      }
+      @media (max-width: 560px) {
+        .app {
+          width: calc(100% - 22px);
+        }
+        .bet {
+          grid-template-columns: 1fr 1fr;
+        }
+        .amount {
+          grid-column: 1/-1;
+        }
+        .meta {
+          grid-template-columns: 1fr 1fr;
+        }
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .sentence-builder {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        font-size: 18px;
+        line-height: 1.8;
+        color: #dce2ea;
+        background: #090d13;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 18px;
+      }
+      .sentence-builder select,
+      .sentence-builder input {
+        background: #151c27;
+        color: var(--text);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 9px;
+        padding: 9px 11px;
+        font-weight: 800;
+        outline: none;
+      }
+      .sentence-builder select:focus,
+      .sentence-builder input:focus {
+        border-color: rgba(255, 212, 0, 0.5);
+      }
+      .sentence-builder select {
+        cursor: pointer;
+      }
+      .price-wrap,
+      .minutes-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        background: #151c27;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 9px;
+        padding-left: 10px;
+      }
+      .price-wrap input {
+        border: 0;
+        background: transparent;
+        width: 110px;
+      }
+      .minutes-wrap input {
+        border: 0;
+        background: transparent;
+        width: 65px;
+      }
+      .currency {
+        color: var(--muted);
+        font-weight: 800;
+      }
+      .preview-box {
+        margin-top: 15px;
+        padding: 13px 15px;
+        border-radius: 13px;
+        background: rgba(255, 212, 0, 0.045);
+        border: 1px solid rgba(255, 212, 0, 0.12);
+      }
+      .preview-box small {
+        display: block;
+        color: var(--muted);
+        font-size: 9px;
+        letter-spacing: 0.1em;
+        margin-bottom: 5px;
+      }
+      .preview-box strong {
+        font-size: 13px;
+        font-weight: 700;
+      }
+      @media (max-width: 560px) {
+        .sentence-builder {
+          font-size: 16px;
+        }
+        .price-wrap input {
+          width: 85px;
+        }
+      }
+    </style>
+    <meta
+      name="google-site-verification"
+      content="LnnBI9kscmoPA_WVmEAQgDRK0ECtA3_OoeT_5vMmDAM"
+    />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="brand">
+          <div class="logo">V</div>
+          <div>
+            <h1>Veynt</h1>
+            <p>Prediction markets · BOT Chain Testnet</p>
+          </div>
+        </div>
+        <button class="wallet" id="connectBtn">Connect Wallet</button>
+      </header>
+
+      <section class="hero">
+        <div>
+          <h2>Predict what happens.<br /><span>Prove what happened.</span></h2>
+          <p>
+            Create a market, make your prediction, and let the Veynt TEE verify
+            the outcome. Winners can claim their BOT payout after resolution.
+          </p>
+        </div>
+        <button class="primary" id="openCreateBtn">＋ Create Market</button>
+      </section>
+
+      <div class="toolbar">
+        <div>
+          <h3>Markets</h3>
+          <small id="marketSummary">Connect your wallet to interact.</small>
+        </div>
+        <button class="ghost" id="refreshBtn">Refresh</button>
+      </div>
+      <main id="markets" class="markets">
+        <div class="empty">Connect your wallet to load markets.</div>
+      </main>
+    </div>
+
+    <div class="modal-bg" id="createModal">
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <h3>Create a market</h3>
+            <p>
+              Set the asset, direction, target price and how long the market
+              stays open. Market creation costs 1 BOT.
+            </p>
+          </div>
+          <button class="close" data-close="createModal">×</button>
+        </div>
+
+        <div class="sentence-builder">
+          <span>Will the price of</span>
+          <select id="assetSelect"></select>
+          <span>be</span>
+          <select id="directionSelect">
+            <option value="ABOVE">above</option>
+            <option value="BELOW">below</option>
+          </select>
+          <span>than</span>
+          <div class="price-wrap">
+            <span class="currency">$</span>
+            <input
+              id="priceInput"
+              type="number"
+              min="0"
+              step="0.01"
+              value="65000"
+            />
+          </div>
+          <span>after</span>
+          <div class="minutes-wrap">
+            <input id="deadlineOffset" type="number" min="1" value="5" />
+            <span>minutes</span>
+          </div>
+          <span>?</span>
+        </div>
+
+        <div class="preview-box">
+          <small>MARKET PREVIEW</small>
+          <strong id="questionPreview"
+            >Will the price of BTC be above $65,000 after 5 minutes?</strong
+          >
+        </div>
+
+        <div class="actions">
+          <button class="ghost" data-close="createModal">Cancel</button>
+          <button class="primary" id="createMarketBtn">Create Market</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-bg" id="resolveModal">
+      <div class="modal">
+        <div class="modal-head">
+          <div>
+            <h3>Resolve market</h3>
+            <p>
+              Enter a GitHub Personal Access Token with permission to trigger
+              the Veynt evaluator workflow.
+            </p>
+          </div>
+          <button class="close" data-close="resolveModal">×</button>
+        </div>
+
+        <form class="field" id="resolveForm" onsubmit="return false;">
+          <label for="githubPat">GitHub Personal Access Token</label>
+          <input
+            id="githubPat"
+            type="password"
+            autocomplete="off"
+            placeholder="github_pat_…"
+          />
+        </form>
+
+        <p class="note">
+          Your PAT is used only for this GitHub workflow request and is not
+          saved by this page.
+        </p>
+
+        <div class="actions">
+          <button class="ghost" data-close="resolveModal">Cancel</button>
+          <button class="primary" id="confirmResolveBtn">
+            Start Resolution
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script type="module">
+      import {
+        createWalletClient,
+        custom,
+        getContract,
+        parseEther,
+        publicActions,
+        defineChain,
+        formatEther,
+      } from "https://esm.sh/viem@2.55.11";
+
+      const botChainTestnet = defineChain({
+        id: 968,
+        name: "BOT Chain Testnet",
+        nativeCurrency: {
+          name: "BOT",
+          symbol: "BOT",
+          decimals: 18,
+        },
+        rpcUrls: {
+          default: {
+            http: ["https://rpc.bohr.life"],
+          },
+        },
+        blockExplorers: {
+          default: {
+            name: "BOTScan",
+            url: "https://scan.bohr.life",
+          },
+        },
+      });
+
+      // Deployed VeyntMarket on BOT Chain Testnet (Chain ID 968)
+      const CONTRACT_ADDRESS = "0x392B82F53b61f253a13B5aE403a000932d9485db";
+      const ASSET_CONFIG = {
+        BTC: { symbol: "BTCUSDT", defaultPrice: 65000 },
+        ETH: { symbol: "ETHUSDT", defaultPrice: 3000 },
+        SOL: { symbol: "SOLUSDT", defaultPrice: 125 },
+        BNB: { symbol: "BNBUSDT", defaultPrice: 700 },
+        XRP: { symbol: "XRPUSDT", defaultPrice: 2.5 },
+        ADA: { symbol: "ADAUSDT", defaultPrice: 0.8 },
+        AVAX: { symbol: "AVAXUSDT", defaultPrice: 30 },
+        LINK: { symbol: "LINKUSDT", defaultPrice: 20 },
+        DOGE: { symbol: "DOGEUSDT", defaultPrice: 0.2 },
+      };
+
+      function populateAssetSelect() {
+        const select = $("assetSelect");
+        if (!select) return;
+
+        select.innerHTML = "";
+
+        Object.keys(ASSET_CONFIG).forEach((asset) => {
+          const option = document.createElement("option");
+          option.value = asset;
+          option.textContent = asset;
+          select.appendChild(option);
+        });
+
+        select.value = "BTC";
+      }
+
+      const PREDICTION_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArKeKZMf2oDUJWwLlrUDy
+5yB+sNQCqNGSkdbZ/ApoEHByzSj17ADH5lq07zvsDBQMMjThF68/1XqSubUSdWfG
+er14CH+U6VTPGxi0S4KkKuZxZkfctbKyazXYm9zYpcyEjOs/1miaOLTq+/fgBb3C
+eGi22aMzL1v9H1a6nyfZJyO5XFxbtDsl9IUPGyGbxjMvaf94cb9382OGx6gTpofc
+07/O+5XFMRGtBJaCA6BYKHx9YjE3+4g3CE5jIgGdHJf2H5CedCFNe2iuds4pDu8k
+qPaCMVfN7648xrThn93zW2HJ+LbkZMaxj9I1kqvVoI+LuL3dtfJxNd0wbITvkAsH
+twIDAQAB
+-----END PUBLIC KEY-----
+`;
+
+      const ABI = [
+        {
+          type: "function",
+          name: "marketCount",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ type: "uint256" }],
+        },
+        {
+          type: "function",
+          name: "markets",
+          stateMutability: "view",
+          inputs: [{ type: "uint256", name: "marketId" }],
+          outputs: [
+            { type: "address", name: "owner" },
+            { type: "string", name: "apiEndpoint" },
+            { type: "string", name: "question" },
+            { type: "uint256", name: "deadline" },
+            { type: "uint256", name: "totalPool" },
+            { type: "bool", name: "resolved" },
+            { type: "bool", name: "outcome" },
+            { type: "bytes32", name: "merkleRoot" },
+            { type: "bool", name: "refundInitiated" },
+            { type: "uint256", name: "startTime" },
+          ],
+        },
+        {
+          type: "function",
+          name: "createMarket",
+          stateMutability: "payable",
+          inputs: [
+            { type: "string", name: "_question" },
+            { type: "uint256", name: "_deadline" },
+            { type: "string", name: "_apiEndpoint" },
+          ],
+          outputs: [{ type: "uint256", name: "marketId" }],
+        },
+        {
+          type: "function",
+          name: "predict",
+          stateMutability: "payable",
+          inputs: [
+            { type: "uint256", name: "_marketId" },
+            { type: "bytes", name: "_encryptedChoice" },
+          ],
+          outputs: [],
+        },
+        {
+          type: "function",
+          name: "hasClaimed",
+          stateMutability: "view",
+          inputs: [
+            { type: "uint256", name: "marketId" },
+            { type: "address", name: "bettor" },
+          ],
+          outputs: [{ type: "bool", name: "claimed" }],
+        },
+        {
+          type: "function",
+          name: "claimPayout",
+          stateMutability: "nonpayable",
+          inputs: [
+            { type: "uint256", name: "_marketId" },
+            { type: "uint256", name: "_payout" },
+            { type: "bytes32[]", name: "_merkleProof" },
+          ],
+          outputs: [],
+        },
+        {
+          type: "function",
+          name: "MARKET_CREATION_FEE",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ type: "uint256" }],
+        },
+        {
+          type: "function",
+          name: "emergencyRefund",
+          stateMutability: "nonpayable",
+          inputs: [{ type: "uint256", name: "_marketId" }],
+          outputs: [],
+        },
+        {
+          type: "function",
+          name: "i_teeSigner",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ type: "address" }],
+        },
+        {
+          type: "function",
+          name: "owner",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ type: "address" }],
+        },
+        {
+          type: "function",
+          name: "accumulatedTreasuryFees",
+          stateMutability: "view",
+          inputs: [],
+          outputs: [{ type: "uint256" }],
+        },
+      ];
+
+      let provider = null;
+      let signer = null;
+      let contract = null;
+      let pendingResolveMarketId = null;
+
+      const ZERO = "0x0000000000000000000000000000000000000000";
+
+      const BOT_CHAIN_ID_HEX = "0x3c8";
+
+      const $ = (id) => document.getElementById(id);
+
+      async function ensureBotChain() {
+        if (!window.ethereum) {
+          throw new Error("Please install MetaMask.");
+        }
+
+        const currentChainId = await window.ethereum.request({
+          method: "eth_chainId",
+        });
+
+        if (currentChainId.toLowerCase() === BOT_CHAIN_ID_HEX) {
+          return;
+        }
+
+        try {
+          await window.ethereum.request({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: BOT_CHAIN_ID_HEX }],
+          });
+        } catch (switchError) {
+          if (switchError?.code !== 4902) {
+            throw switchError;
+          }
+
+          await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: BOT_CHAIN_ID_HEX,
+                chainName: "BOT Chain",
+                nativeCurrency: {
+                  name: "BOT",
+                  symbol: "BOT",
+                  decimals: 18,
+                },
+                rpcUrls: ["https://rpc.bohr.life"],
+                blockExplorerUrls: ["https://scan.botchain.ai"],
+              },
+            ],
+          });
+        }
+      }
+
+      function toast(message) {
+        const el = $("toast");
+        if (!el) return;
+        el.textContent = message;
+        el.classList.add("show");
+        clearTimeout(window.__toastTimer);
+        window.__toastTimer = setTimeout(
+          () => el.classList.remove("show"),
+          4500,
+        );
+      }
+
+      function formatRemaining(deadline) {
+        const remaining = Number(deadline) * 1000 - Date.now();
+        if (remaining <= 0) return "Deadline passed";
+
+        let seconds = Math.floor(remaining / 1000);
+        const hours = Math.floor(seconds / 3600);
+        seconds %= 3600;
+        const minutes = Math.floor(seconds / 60);
+        seconds %= 60;
+
+        if (hours > 0) return `${hours}h ${minutes}m remaining`;
+        return `${minutes}m ${seconds}s remaining`;
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;");
+      }
+
+      function questionText(question) {
+        const parts = question.split("|");
+
+        if (parts.length === 3) {
+          const asset = parts[0];
+          const direction = parts[1].toLowerCase();
+          const price = Number(parts[2]) / 1e8;
+
+          return `Will the price of ${asset} be ${direction} $${price.toLocaleString()}?`;
+        }
+
+        return question;
+      }
+
+      async function connectWallet() {
+        if (!window.ethereum) {
+          toast("Please install MetaMask.");
+          return;
+        }
+
+        try {
+          await ensureBotChain();
+
+          provider = createWalletClient({
+            chain: botChainTestnet,
+            transport: custom(window.ethereum),
+          }).extend(publicActions);
+
+          const accounts = await provider.requestAddresses();
+
+          signer = {
+            address: accounts[0],
+          };
+
+          contract = getContract({
+            address: CONTRACT_ADDRESS,
+            abi: ABI,
+            client: {
+              public: provider,
+              wallet: provider,
+            },
+          });
+
+          $("connectBtn").textContent =
+            `${signer.address.slice(0, 6)}…${signer.address.slice(-4)}`;
+
+          $("connectBtn").classList.add("connected");
+
+          $("marketSummary").textContent =
+            `Connected · ${signer.address.slice(0, 6)}…${signer.address.slice(-4)}`;
+
+          await loadMarkets();
+          toast("Wallet connected.");
+        } catch (error) {
+          console.error(error);
+          toast(`Connection failed: ${error.shortMessage || error.message}`);
+        }
+      }
+
+      async function loadMarkets() {
+        if (!contract) return;
+
+        try {
+          const count = await contract.read.marketCount();
+          const markets = [];
+
+          for (let id = 1n; id <= count; id++) {
+            const market = await contract.read.markets([id]);
+
+            if (market[0] === ZERO) continue;
+
+            markets.push({
+              id,
+              owner: market[0],
+              apiEndpoint: market[1],
+              question: market[2],
+              deadline: market[3],
+              totalPool: market[4],
+              resolved: market[5],
+              outcome: market[6],
+              merkleRoot: market[7],
+              refundInitiated: market[8],
+              startTime: market[9],
+            });
+          }
+
+          if (markets.length === 0) {
+            $("markets").innerHTML =
+              '<div class="empty">No markets yet. Create the first one.</div>';
+            return;
+          }
+
+          $("markets").innerHTML = markets
+            .reverse()
+            .map((market) => {
+              const passed = Number(market.deadline) * 1000 <= Date.now();
+
+              let badge;
+
+              if (market.resolved) {
+                badge = `<span class="badge resolved">RESOLVED · ${market.outcome ? "YES" : "NO"}</span>`;
+              } else {
+                badge = `<span class="badge">${passed ? "DEADLINE PASSED" : "LIVE"}</span>`;
+              }
+
+              if (market.resolved) {
+                return `
+          <article class="card" data-id="${market.id}">
+            <div class="top">
+              <span class="id">Market #${market.id}</span>
+              ${badge}
+            </div>
+
+            <div class="question">
+              ${escapeHtml(questionText(market.question))}
+            </div>
+
+            <div class="meta">
+              <div>
+                <small>POOL</small>
+                <strong>${formatEther(market.totalPool)} BOT</strong>
+              </div>
+
+              <div>
+                <small>DEADLINE</small>
+                <strong>${new Date(Number(market.deadline) * 1000).toLocaleString()}</strong>
+              </div>
+
+              <div>
+                <small>RESULT</small>
+                <strong>${market.outcome ? "YES" : "NO"}</strong>
+              </div>
+            </div>
+
+            <div class="timer">
+              Market resolved.
+            </div>
+
+            <div class="row">
+              <span class="note">
+                Winning side: <b>${market.outcome ? "YES" : "NO"}</b>
+              </span>
+
+              <button class="claim" data-claim="${market.id}">
+                Claim Winnings
+              </button>
+            </div>
+          </article>
+        `;
+              }
+
+              return `
+        <article
+          class="card"
+          data-id="${market.id}"
+          data-deadline="${market.deadline}"
+        >
+          <div class="top">
+            <span class="id">Market #${market.id}</span>
+            ${badge}
+          </div>
+
+          <div class="question">
+            ${escapeHtml(questionText(market.question))}
+          </div>
+
+          <div class="meta">
+            <div>
+              <small>POOL</small>
+              <strong>${formatEther(market.totalPool)} BOT</strong>
+            </div>
+
+            <div>
+              <small>DEADLINE</small>
+              <strong>${new Date(Number(market.deadline) * 1000).toLocaleString()}</strong>
+            </div>
+
+            <div>
+              <small>RESULT</small>
+              <strong>Pending</strong>
+            </div>
+          </div>
+
+          <div class="timer" id="timer-${market.id}">
+            ${formatRemaining(market.deadline)}
+          </div>
+
+          <div class="bet">
+            <input
+              class="amount"
+              id="amt-${market.id}"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Amount in BOT"
+            />
+
+            <button
+              class="yes"
+              data-predict="${market.id}"
+              data-choice="YES"
+            >
+              YES
+            </button>
+
+            <button
+              class="no"
+              data-predict="${market.id}"
+              data-choice="NO"
+            >
+              NO
+            </button>
+          </div>
+
+          <div class="row">
+            <span class="note">
+              ${passed ? "Market deadline passed." : "Prediction is open."}
+            </span>
+          </div>
+
+          ${
+            passed
+              ? `
+                <div class="actions">
+                  <button class="resolve" data-resolve="${market.id}">
+                    Resolve Market
+                  </button>
+                </div>
+              `
+              : ""
+          }
+        </article>
+      `;
+            })
+            .join("");
+        } catch (error) {
+          console.error(error);
+          toast(
+            `Could not load markets: ${error.shortMessage || error.message}`,
+          );
+        }
+      }
+
+      function updateQuestionPreview() {
+        const asset = $("assetSelect").value;
+        const direction = $("directionSelect").value;
+        const price = Number($("priceInput").value || 0);
+        const minutes = Number($("deadlineOffset").value || 0);
+
+        $("questionPreview").textContent =
+          `Will the price of ${asset} be ${direction.toLowerCase()} $${price.toLocaleString()} after ${minutes} minutes?`;
+      }
+
+      function updateAssetDefaults() {
+        const asset = $("assetSelect").value;
+        const config = ASSET_CONFIG[asset];
+        if (!config) return;
+        $("priceInput").value = config.defaultPrice;
+        updateQuestionPreview();
+      }
+
+      async function createMarket() {
+        if (!contract || !signer) {
+          toast("Connect your wallet first.");
+          return;
+        }
+
+        try {
+          const asset = $("assetSelect").value;
+          const assetConfig = ASSET_CONFIG[asset];
+          const direction = $("directionSelect").value;
+          const price = Number($("priceInput").value);
+          const minutes = Number($("deadlineOffset").value);
+
+          if (!assetConfig) {
+            throw new Error("Unsupported asset.");
+          }
+
+          if (!price || price <= 0) {
+            throw new Error("Enter a valid target price.");
+          }
+
+          if (!minutes || minutes <= 0) {
+            throw new Error("Enter a valid duration.");
+          }
+
+          // IMPORTANT:
+          // evaluator.js expects:
+          // BTC|ABOVE|6500000000000
+          // BTC|BELOW|6500000000000
+          const targetScaled = BigInt(Math.round(price * 100000000)).toString();
+
+          const question = `${asset}|${direction}|${targetScaled}`;
+
+          const deadline =
+            Math.floor((Date.now() + minutes * 60 * 1000) / 60000) * 60;
+
+          // VeyntMarket uses a fixed 1 BOT creation fee.
+          // No FTSO / getRequiredFee() call is needed.
+          const marketCreationFee = parseEther("1");
+
+          const txHash = await contract.write.createMarket(
+            [
+              question,
+              BigInt(deadline),
+              `https://data-api.binance.vision/api/v3/klines?symbol=${assetConfig.symbol}&interval=1m`,
+            ],
+            {
+              value: marketCreationFee,
+              account: signer.address,
+            },
+          );
+
+          const receipt = await provider.waitForTransactionReceipt({
+            hash: txHash,
+          });
+
+          if (receipt.status !== "success") {
+            throw new Error("Transaction failed.");
+          }
+
+          $("createModal").classList.remove("open");
+
+          toast("Market created successfully — 1 BOT creation fee paid.");
+
+          await loadMarkets();
+        } catch (error) {
+          console.error(error);
+          toast(`Create failed: ${error.shortMessage || error.message}`);
+        }
+      }
+      async function encryptPrediction(prediction) {
+        const pem = PREDICTION_PUBLIC_KEY.replace(
+          "-----BEGIN PUBLIC KEY-----",
+          "",
+        )
+          .replace("-----END PUBLIC KEY-----", "")
+          .replace(/\s/g, "");
+
+        const binary = atob(pem);
+        const keyBytes = new Uint8Array(binary.length);
+
+        for (let i = 0; i < binary.length; i++) {
+          keyBytes[i] = binary.charCodeAt(i);
+        }
+
+        const publicKey = await crypto.subtle.importKey(
+          "spki",
+          keyBytes.buffer,
+          {
+            name: "RSA-OAEP",
+            hash: "SHA-256",
+          },
+          false,
+          ["encrypt"],
+        );
+
+        const plaintext = new TextEncoder().encode(prediction);
+
+        const encrypted = await crypto.subtle.encrypt(
+          {
+            name: "RSA-OAEP",
+          },
+          publicKey,
+          plaintext,
+        );
+
+        return (
+          "0x" +
+          Array.from(new Uint8Array(encrypted))
+            .map((byte) => byte.toString(16).padStart(2, "0"))
+            .join("")
+        );
+      }
+
+      async function predict(marketId, choice) {
+        if (!contract || !signer) {
+          toast("Connect your wallet first.");
+          return;
+        }
+
+        try {
+          const amount = $(`amt-${marketId}`).value;
+
+          if (!amount || Number(amount) <= 0) {
+            throw new Error("Enter the amount first.");
+          }
+
+          const txHash = await contract.write.predict(
+            [BigInt(marketId), await encryptPrediction(choice)],
+            {
+              value: parseEther(amount),
+              account: signer.address,
+            },
+          );
+
+          const receipt = await provider.waitForTransactionReceipt({
+            hash: txHash,
+          });
+
+          if (receipt.status !== "success") {
+            throw new Error("Prediction failed.");
+          }
+
+          toast(`Prediction ${choice} placed.`);
+
+          await loadMarkets();
+        } catch (error) {
+          console.error(error);
+          toast(`Prediction failed: ${error.shortMessage || error.message}`);
+        }
+      }
+
+      function openResolveModal(marketId) {
+        pendingResolveMarketId = String(marketId);
+        $("githubPat").value = "";
+        $("resolveModal").classList.add("open");
+        setTimeout(() => $("githubPat").focus(), 50);
+      }
+
+      async function triggerResolution() {
+        if (!pendingResolveMarketId) {
+          toast("No market selected.");
+          return;
+        }
+
+        const pat = $("githubPat").value.trim();
+
+        if (!pat) {
+          toast("Enter your GitHub PAT.");
+          return;
+        }
+
+        const button = $("confirmResolveBtn");
+        button.disabled = true;
+        button.textContent = "Starting…";
+
+        /*
+         * Direct GitHub Actions workflow_dispatch.
+         *
+         * This is the same mechanism as the existing working
+         * "Trigger TEE Finalize Workflow" section.
+         *
+         * The PAT is supplied by the user at runtime.
+         * It is NOT hardcoded into this HTML and is not stored.
+         */
+        const GITHUB_OWNER = "Pandey456";
+        const GITHUB_REPO = "VEYNT";
+
+        /*
+         * IMPORTANT:
+         * This must match the actual filename under:
+         * .github/workflows/
+         *
+         * Example:
+         * .github/workflows/fdc-full-run.yml
+         */
+        const GITHUB_WORKFLOW = "fdc-full-run.yml";
+        const GITHUB_REF = "main";
+
+        const url =
+          `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}` +
+          `/actions/workflows/${encodeURIComponent(GITHUB_WORKFLOW)}/dispatches`;
+
+        try {
+          const response = await fetch(url, {
+            method: "POST",
+            headers: {
+              Accept: "application/vnd.github+json",
+              Authorization: `Bearer ${pat}`,
+              "X-GitHub-Api-Version": "2022-11-28",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              ref: GITHUB_REF,
+              inputs: {
+                market_id: String(pendingResolveMarketId),
+              },
+            }),
+          });
+
+          /*
+           * GitHub returns HTTP 204 when workflow_dispatch
+           * was accepted successfully.
+           */
+          if (response.status !== 204) {
+            const body = await response.text();
+
+            let message = `GitHub returned HTTP ${response.status}.`;
+
+            try {
+              const json = JSON.parse(body);
+
+              if (json.message) {
+                message += ` ${json.message}`;
+              }
+            } catch {
+              // Ignore non-JSON response bodies.
+            }
+
+            throw new Error(message);
+          }
+
+          const resolvedMarketId = pendingResolveMarketId;
+
+          $("resolveModal").classList.remove("open");
+          $("githubPat").value = "";
+          pendingResolveMarketId = null;
+
+          toast(`GitHub evaluator started for Market #${resolvedMarketId}.`);
+
+          await loadMarkets();
+        } catch (error) {
+          console.error("GitHub workflow trigger failed:", error);
+
+          /*
+           * Never print the PAT.
+           */
+          toast(`Resolve failed: ${error.message}`);
+        } finally {
+          button.disabled = false;
+          button.textContent = "Start Resolution";
+        }
+      }
+
+      async function claim(marketId, button) {
+        if (!contract || !signer) {
+          toast("Connect your wallet first.");
+          return;
+        }
+
+        try {
+          button.disabled = true;
+          button.textContent = "Claiming…";
+
+          const url = `https://raw.githubusercontent.com/Pandey456/VEYNT/main/veyntmarket-tee/payouts/market-${marketId}.json?t=${Date.now()}`;
+          const response = await fetch(url);
+
+          if (!response.ok) {
+            throw new Error("Payout data is not published yet.");
+          }
+
+          const data = await response.json();
+
+          const winner = data.winners?.find(
+            (item) =>
+              item.bettor.toLowerCase() === signer.address.toLowerCase(),
+          );
+
+          if (!winner) {
+            throw new Error("No winning payout belongs to this wallet.");
+          }
+
+          const alreadyClaimed = await contract.read.hasClaimed([
+            BigInt(marketId),
+            signer.address,
+          ]);
+
+          if (alreadyClaimed) {
+            throw new Error("Already claimed.");
+          }
+
+          const txHash = await contract.write.claimPayout(
+            [BigInt(marketId), BigInt(winner.payout), winner.proof || []],
+            {
+              account: signer.address,
+            },
+          );
+
+          const receipt = await provider.waitForTransactionReceipt({
+            hash: txHash,
+          });
+
+          if (receipt.status !== "success") {
+            throw new Error("Claim transaction failed.");
+          }
+
+          toast(
+            `Claimed ${winner.payoutBot || formatEther(BigInt(winner.payout))} BOT.`,
+          );
+
+          await loadMarkets();
+        } catch (error) {
+          console.error(error);
+          toast(`Claim failed: ${error.shortMessage || error.message}`);
+        } finally {
+          button.disabled = false;
+          button.textContent = "Claim Winnings";
+        }
+      }
+
+      function setupEvents() {
+        populateAssetSelect();
+        $("connectBtn").addEventListener("click", connectWallet);
+
+        $("refreshBtn").addEventListener("click", loadMarkets);
+
+        $("openCreateBtn").addEventListener("click", () => {
+          $("createModal").classList.add("open");
+          updateQuestionPreview();
+        });
+
+        $("createMarketBtn").addEventListener("click", createMarket);
+
+        $("confirmResolveBtn").addEventListener("click", triggerResolution);
+
+        $("githubPat").addEventListener("keydown", (event) => {
+          if (event.key === "Enter") {
+            triggerResolution();
+          }
+        });
+
+        for (const id of [
+          "assetSelect",
+          "directionSelect",
+          "priceInput",
+          "deadlineOffset",
+        ]) {
+          $(id).addEventListener("input", updateQuestionPreview);
+          $(id).addEventListener("change", updateQuestionPreview);
+        }
+
+        $("assetSelect").addEventListener("change", updateAssetDefaults);
+
+        document.addEventListener("click", async (event) => {
+          const predictButton = event.target.closest("[data-predict]");
+
+          if (predictButton) {
+            await predict(
+              predictButton.dataset.predict,
+              predictButton.dataset.choice,
+            );
+            return;
+          }
+
+          const resolveButton = event.target.closest("[data-resolve]");
+
+          if (resolveButton) {
+            openResolveModal(resolveButton.dataset.resolve);
+            return;
+          }
+
+          const claimButton = event.target.closest("[data-claim]");
+
+          if (claimButton) {
+            await claim(claimButton.dataset.claim, claimButton);
+            return;
+          }
+
+          const closeButton = event.target.closest("[data-close]");
+
+          if (closeButton) {
+            $(closeButton.dataset.close).classList.remove("open");
+          }
+
+          if (event.target.classList.contains("modal-bg")) {
+            event.target.classList.remove("open");
+          }
+        });
+
+        updateQuestionPreview();
+      }
+
+      setInterval(() => {
+        document.querySelectorAll(".card").forEach((card) => {
+          const deadline = Number(card.dataset.deadline);
+
+          if (!deadline) return;
+
+          const timer = $(`timer-${card.dataset.id}`);
+
+          if (timer) {
+            timer.textContent = formatRemaining(deadline);
+          }
+        });
+      }, 1000);
+
+      if (window.ethereum) {
+        window.ethereum.on("accountsChanged", () => location.reload());
+
+        window.ethereum.on("chainChanged", () => location.reload());
+      }
+
+      setupEvents();
+    </script>
+  </body>
+</html>
