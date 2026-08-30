@@ -504,7 +504,7 @@
           <div class="logo">V</div>
           <div>
             <h1>Veynt</h1>
-            <p>Prediction markets · BOT Chain Mainnet</p>
+            <p>Prediction markets · BOT Chain Testnet</p>
           </div>
         </div>
         <button class="wallet" id="connectBtn">Connect Wallet</button>
@@ -548,9 +548,7 @@
 
         <div class="sentence-builder">
           <span>Will the price of</span>
-          <select id="assetSelect">
-            <option value="BTC">BTC</option>
-          </select>
+          <select id="assetSelect"></select>
           <span>be</span>
           <select id="directionSelect">
             <option value="ABOVE">above</option>
@@ -639,9 +637,9 @@
         formatEther,
       } from "https://esm.sh/viem@2.55.11";
 
-      const botChainMainnet = defineChain({
-        id: 677,
-        name: "BOT Chain",
+      const botChainTestnet = defineChain({
+        id: 968,
+        name: "BOT Chain Testnet",
         nativeCurrency: {
           name: "BOT",
           symbol: "BOT",
@@ -649,20 +647,47 @@
         },
         rpcUrls: {
           default: {
-            http: ["https://rpc.botchain.ai"],
+            http: ["https://rpc.bohr.life"],
           },
         },
         blockExplorers: {
           default: {
             name: "BOTScan",
-            url: "https://scan.botchain.ai",
+            url: "https://scan.bohr.life",
           },
         },
       });
 
       // Deployed VeyntMarket on BOT Chain Testnet (Chain ID 968)
-      //const CONTRACT_ADDRESS_OF_TESTNET = "0xDaeB6e9b5c2E67B0C35F97FE9A0a67296AfE3771";
-      const CONTRACT_ADDRESS = "0xae1cf56E2Df39E4EE9203DcEd781C75799E36202";
+      const CONTRACT_ADDRESS = "0x392B82F53b61f253a13B5aE403a000932d9485db";
+      const ASSET_CONFIG = {
+        BTC: { symbol: "BTCUSDT", defaultPrice: 65000 },
+        ETH: { symbol: "ETHUSDT", defaultPrice: 3000 },
+        SOL: { symbol: "SOLUSDT", defaultPrice: 125 },
+        BNB: { symbol: "BNBUSDT", defaultPrice: 700 },
+        XRP: { symbol: "XRPUSDT", defaultPrice: 2.5 },
+        ADA: { symbol: "ADAUSDT", defaultPrice: 0.8 },
+        AVAX: { symbol: "AVAXUSDT", defaultPrice: 30 },
+        LINK: { symbol: "LINKUSDT", defaultPrice: 20 },
+        DOGE: { symbol: "DOGEUSDT", defaultPrice: 0.2 },
+      };
+
+      function populateAssetSelect() {
+        const select = $("assetSelect");
+        if (!select) return;
+
+        select.innerHTML = "";
+
+        Object.keys(ASSET_CONFIG).forEach((asset) => {
+          const option = document.createElement("option");
+          option.value = asset;
+          option.textContent = asset;
+          select.appendChild(option);
+        });
+
+        select.value = "BTC";
+      }
+
       const PREDICTION_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArKeKZMf2oDUJWwLlrUDy
 5yB+sNQCqNGSkdbZ/ApoEHByzSj17ADH5lq07zvsDBQMMjThF68/1XqSubUSdWfG
@@ -696,6 +721,8 @@ twIDAQAB
             { type: "bool", name: "resolved" },
             { type: "bool", name: "outcome" },
             { type: "bytes32", name: "merkleRoot" },
+            { type: "bool", name: "refundInitiated" },
+            { type: "uint256", name: "startTime" },
           ],
         },
         {
@@ -707,15 +734,15 @@ twIDAQAB
             { type: "uint256", name: "_deadline" },
             { type: "string", name: "_apiEndpoint" },
           ],
-          outputs: [],
+          outputs: [{ type: "uint256", name: "marketId" }],
         },
         {
           type: "function",
           name: "predict",
           stateMutability: "payable",
           inputs: [
-            { type: "uint256", name: "marketId" },
-            { type: "bytes", name: "encryptedChoice" },
+            { type: "uint256", name: "_marketId" },
+            { type: "bytes", name: "_encryptedChoice" },
           ],
           outputs: [],
         },
@@ -727,16 +754,16 @@ twIDAQAB
             { type: "uint256", name: "marketId" },
             { type: "address", name: "bettor" },
           ],
-          outputs: [{ type: "bool" }],
+          outputs: [{ type: "bool", name: "claimed" }],
         },
         {
           type: "function",
           name: "claimPayout",
           stateMutability: "nonpayable",
           inputs: [
-            { type: "uint256", name: "marketId" },
-            { type: "uint256", name: "payout" },
-            { type: "bytes32[]", name: "merkleProof" },
+            { type: "uint256", name: "_marketId" },
+            { type: "uint256", name: "_payout" },
+            { type: "bytes32[]", name: "_merkleProof" },
           ],
           outputs: [],
         },
@@ -751,7 +778,7 @@ twIDAQAB
           type: "function",
           name: "emergencyRefund",
           stateMutability: "nonpayable",
-          inputs: [{ type: "uint256", name: "marketId" }],
+          inputs: [{ type: "uint256", name: "_marketId" }],
           outputs: [],
         },
         {
@@ -784,7 +811,7 @@ twIDAQAB
 
       const ZERO = "0x0000000000000000000000000000000000000000";
 
-      const BOT_CHAIN_ID_HEX = "0x2a5";
+      const BOT_CHAIN_ID_HEX = "0x3c8";
 
       const $ = (id) => document.getElementById(id);
 
@@ -822,7 +849,7 @@ twIDAQAB
                   symbol: "BOT",
                   decimals: 18,
                 },
-                rpcUrls: ["https://rpc.botchain.ai"],
+                rpcUrls: ["https://rpc.bohr.life"],
                 blockExplorerUrls: ["https://scan.botchain.ai"],
               },
             ],
@@ -888,7 +915,7 @@ twIDAQAB
           await ensureBotChain();
 
           provider = createWalletClient({
-            chain: botChainMainnet,
+            chain: botChainTestnet,
             transport: custom(window.ethereum),
           }).extend(publicActions);
 
@@ -945,6 +972,8 @@ twIDAQAB
               resolved: market[5],
               outcome: market[6],
               merkleRoot: market[7],
+              refundInitiated: market[8],
+              startTime: market[9],
             });
           }
 
@@ -1115,6 +1144,14 @@ twIDAQAB
           `Will the price of ${asset} be ${direction.toLowerCase()} $${price.toLocaleString()} after ${minutes} minutes?`;
       }
 
+      function updateAssetDefaults() {
+        const asset = $("assetSelect").value;
+        const config = ASSET_CONFIG[asset];
+        if (!config) return;
+        $("priceInput").value = config.defaultPrice;
+        updateQuestionPreview();
+      }
+
       async function createMarket() {
         if (!contract || !signer) {
           toast("Connect your wallet first.");
@@ -1123,9 +1160,14 @@ twIDAQAB
 
         try {
           const asset = $("assetSelect").value;
+          const assetConfig = ASSET_CONFIG[asset];
           const direction = $("directionSelect").value;
           const price = Number($("priceInput").value);
           const minutes = Number($("deadlineOffset").value);
+
+          if (!assetConfig) {
+            throw new Error("Unsupported asset.");
+          }
 
           if (!price || price <= 0) {
             throw new Error("Enter a valid target price.");
@@ -1154,7 +1196,7 @@ twIDAQAB
             [
               question,
               BigInt(deadline),
-              "https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1m",
+              `https://data-api.binance.vision/api/v3/klines?symbol=${assetConfig.symbol}&interval=1m`,
             ],
             {
               value: marketCreationFee,
@@ -1441,6 +1483,7 @@ twIDAQAB
       }
 
       function setupEvents() {
+        populateAssetSelect();
         $("connectBtn").addEventListener("click", connectWallet);
 
         $("refreshBtn").addEventListener("click", loadMarkets);
@@ -1467,9 +1510,10 @@ twIDAQAB
           "deadlineOffset",
         ]) {
           $(id).addEventListener("input", updateQuestionPreview);
-
           $(id).addEventListener("change", updateQuestionPreview);
         }
+
+        $("assetSelect").addEventListener("change", updateAssetDefaults);
 
         document.addEventListener("click", async (event) => {
           const predictButton = event.target.closest("[data-predict]");
