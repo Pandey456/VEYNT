@@ -6,21 +6,14 @@ const {
   decodeAbiParameters,
   parseAbiParameters,
   keccak256,
-  encodeAbiParameters,
+  defineChain,
+  encodePacked,
 } = require("viem");
 
 const { privateKeyToAccount } = require("viem/accounts");
-const { defineChain } = require("viem");
-const { StandardMerkleTree } = require("@openzeppelin/merkle-tree");
-
-const { VEYNT_MARKET_ADDRESS, VEYNT_MARKET_ABI } = require("./constants.js");
-
-const fs = require("fs");
-const path = require("path");
-
-const botChainTestnet = defineChain({
-  id: 968,
-  name: "BOT Chain Testnet",
+const botChainMainnet = defineChain({
+  id: 677,
+  name: "BOT Chain",
   nativeCurrency: {
     name: "BOT",
     symbol: "BOT",
@@ -28,16 +21,22 @@ const botChainTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ["https://rpc.bohr.life"],
+      http: ["https://rpc.botchain.ai"],
     },
   },
   blockExplorers: {
     default: {
       name: "BOTScan",
-      url: "https://scan.bohr.life",
+      url: "https://scan.botchain.ai",
     },
   },
 });
+const { StandardMerkleTree } = require("@openzeppelin/merkle-tree");
+
+const { VEYNT_MARKET_ADDRESS, VEYNT_MARKET_ABI } = require("./constants.js");
+
+const fs = require("fs");
+const path = require("path");
 
 // ============================================================
 // CONFIGURATION
@@ -46,7 +45,9 @@ const botChainTestnet = defineChain({
 if (!process.env.MARKET_ID) {
   throw new Error("FATAL: MARKET_ID environment variable is missing.");
 }
+
 const MARKET_ID = BigInt(process.env.MARKET_ID);
+
 if (!process.env.PRIVATE_KEY) {
   throw new Error("FATAL: PRIVATE_KEY environment variable is missing.");
 }
@@ -64,7 +65,7 @@ if (!VEYNT_MARKET_ADDRESS) {
   throw new Error("FATAL: VEYNT_MARKET_ADDRESS is missing.");
 }
 
-const RPC_URL = "https://rpc.bohr.life";
+const RPC_URL = "https://rpc.botchain.ai";
 
 // ============================================================
 // ACCOUNTS
@@ -83,13 +84,13 @@ const teeAccount = privateKeyToAccount(process.env.TEE_PRIVATE_KEY);
 // ============================================================
 
 const publicClient = createPublicClient({
-  chain: botChainTestnet,
+  chain: botChainMainnet,
   transport: http(RPC_URL),
 });
 
 const walletClient = createWalletClient({
   account: deployerAccount,
-  chain: botChainTestnet,
+  chain: botChainMainnet,
   transport: http(RPC_URL),
 });
 
@@ -169,8 +170,6 @@ async function getMarket() {
     resolved: market[5],
     outcome: market[6],
     merkleRoot: market[7],
-    refundInitiated: market[8],
-    startTime: market[9],
   };
 
   if (
@@ -183,9 +182,7 @@ async function getMarket() {
   if (marketData.resolved) {
     throw new Error("Market is already resolved.");
   }
-  if (marketData.refundInitiated) {
-    throw new Error("Emergency refund has already been initiated.");
-  }
+
   return marketData;
 }
 
@@ -241,15 +238,17 @@ function parseMarketQuestion(question) {
 // when it is imported.
 // ============================================================
 
-async function getFdcPrice(token, startTime, deadline, interval) {
+async function getFdcPrice(deadline) {
+  // FDC uses this timestamp to query the API
+  // at the market deadline.
+
+  process.env.MARKET_DEADLINE_MS = (Number(deadline) * 1000).toString();
+
+  console.log("Deadline Set:", process.env.MARKET_DEADLINE_MS);
+
   const { main: runFdc } = require("./fdc-run.js");
 
-  const proofData = await runFdc({
-    token,
-    startTime: Number(startTime) * 1000,
-    deadline: Number(deadline) * 1000,
-    interval,
-  });
+  const proofData = await runFdc();
 
   const abiEncodedData = proofData.response.responseBody.abiEncodedData;
 
@@ -257,15 +256,12 @@ async function getFdcPrice(token, startTime, deadline, interval) {
     throw new Error("FDC response does not contain abiEncodedData.");
   }
 
-  const [{ maxPrice, minPrice }] = decodeAbiParameters(
-    parseAbiParameters("(uint256 maxPrice, uint256 minPrice)"),
+  const [{ price: verifiedPrice }] = decodeAbiParameters(
+    parseAbiParameters("(uint256 price)"),
     abiEncodedData,
   );
 
-  return {
-    maxPrice,
-    minPrice,
-  };
+  return verifiedPrice;
 }
 
 // ============================================================
@@ -285,13 +281,13 @@ async function getFdcPrice(token, startTime, deadline, interval) {
 // Otherwise NO wins.
 // ============================================================
 
-function determineWinningSide(direction, maxPrice, minPrice, targetPrice) {
+function determineWinningSide(direction, verifiedPrice, targetPrice) {
   if (direction === "ABOVE") {
-    return maxPrice >= targetPrice ? "YES" : "NO";
+    return verifiedPrice >= targetPrice ? "YES" : "NO";
   }
 
   if (direction === "BELOW") {
-    return minPrice <= targetPrice ? "YES" : "NO";
+    return verifiedPrice <= targetPrice ? "YES" : "NO";
   }
 
   throw new Error(`Unsupported direction: ${direction}`);
@@ -523,8 +519,7 @@ function createPayoutMerkleTree(payouts) {
 function saveClaimData({
   market,
   winningOutcome,
-  maxPrice,
-  minPrice,
+  verifiedPrice,
   targetPrice,
   merkleRoot,
   winnersWithProofs,
@@ -548,8 +543,7 @@ function saveClaimData({
 
     winningOutcome,
 
-    maxPrice: maxPrice.toString(),
-    minPrice: minPrice.toString(),
+    verifiedPrice: verifiedPrice.toString(),
 
     targetPrice: targetPrice.toString(),
 
@@ -587,36 +581,26 @@ function saveClaimData({
 // This MUST match the Solidity contract:
 //
 // keccak256(
-//     abi.encode(
-//         block.chainid,
-//         address(this),
+//     abi.encodePacked(
 //         _marketId,
 //         _merkleRoot,
 //         _outcome
 //     )
 // )
 //
+// Then Solidity adds:
+//
+// "\x19Ethereum Signed Message:\n32"
+//
 // Viem's signMessage({ message: { raw } })
-// adds the Ethereum signed-message prefix.
+// adds that Ethereum signed-message prefix.
 // ============================================================
 
 async function signResolution(merkleRoot, winningOutcome) {
   const messageHash = keccak256(
-    encodeAbiParameters(
-      [
-        { type: "uint256" },
-        { type: "address" },
-        { type: "uint256" },
-        { type: "bytes32" },
-        { type: "string" },
-      ],
-      [
-        BigInt(botChainTestnet.id),
-        VEYNT_MARKET_ADDRESS,
-        MARKET_ID,
-        merkleRoot,
-        winningOutcome,
-      ],
+    encodePacked(
+      ["uint256", "bytes32", "string"],
+      [MARKET_ID, merkleRoot, winningOutcome],
     ),
   );
 
@@ -674,7 +658,7 @@ async function runProductionEvaluator() {
   console.log("STEP 1 — Reading market...");
 
   const market = await getMarket();
-  const startTime = market.startTime;
+
   console.log("Raw Market:", market);
 
   const { symbol, direction, targetPrice } = parseMarketQuestion(
@@ -689,11 +673,6 @@ async function runProductionEvaluator() {
 
   console.log(`Target Price:  $${Number(targetPrice) / 1e8}`);
 
-  console.log(
-    "Market Start Time:",
-    new Date(Number(startTime) * 1000).toISOString(),
-  );
-
   console.log(`Deadline:      ${market.deadline.toString()}`);
 
   console.log(`Total Pool:    ${market.totalPool.toString()}`);
@@ -703,29 +682,15 @@ async function runProductionEvaluator() {
   // GET PRICE + DETERMINE WINNER
   // ==========================================================
 
-  console.log("\nSTEP 2 — Getting FDC prices...");
+  console.log("\nSTEP 2 — Getting FDC price...");
 
-  const durationMs = (Number(market.deadline) - Number(startTime)) * 1000;
+  const verifiedPrice = await getFdcPrice(market.deadline);
 
-  const interval = durationMs <= 16 * 60 * 60 * 1000 ? "1m" : "1h";
-
-  const { maxPrice, minPrice } = await getFdcPrice(
-    symbol,
-    startTime,
-    market.deadline,
-    interval,
-  );
-
-  console.log(`FDC Maximum Price: $${Number(maxPrice) / 1e8}`);
-
-  console.log(`FDC Minimum Price: $${Number(minPrice) / 1e8}`);
-
-  console.log(`FDC Interval: ${interval}`);
+  console.log(`FDC Verified Price: $${Number(verifiedPrice) / 1e8}`);
 
   const winningOutcome = determineWinningSide(
     direction,
-    maxPrice,
-    minPrice,
+    verifiedPrice,
     targetPrice,
   );
 
@@ -864,8 +829,7 @@ async function runProductionEvaluator() {
   const claimFile = saveClaimData({
     market,
     winningOutcome,
-    maxPrice,
-    minPrice,
+    verifiedPrice,
     targetPrice,
     merkleRoot,
     winnersWithProofs,
@@ -888,8 +852,7 @@ async function runProductionEvaluator() {
 
   console.log(`Winning Side:    ${winningOutcome}`);
 
-  console.log(`Maximum Price:   $${Number(maxPrice) / 1e8}`);
-  console.log(`Minimum Price:   $${Number(minPrice) / 1e8}`);
+  console.log(`Verified Price:  $${Number(verifiedPrice) / 1e8}`);
 
   console.log(`Target Price:    $${Number(targetPrice) / 1e8}`);
 

@@ -1,0 +1,15 @@
+const TOKEN_SYMBOLS = {
+  BTC: "BTCUSDT",
+  ETH: "ETHUSDT",
+  SOL: "SOLUSDT",
+  BNB: "BNBUSDT",
+  XRP: "XRPUSDT",
+  ADA: "ADAUSDT",
+  AVAX: "AVAXUSDT",
+  LINK: "LINKUSDT",
+  DOGE: "DOGEUSDT",
+};
+
+module.exports = {
+  TOKEN_SYMBOLS,
+};

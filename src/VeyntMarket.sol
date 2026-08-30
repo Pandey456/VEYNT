@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
-
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract VeyntMarket {
+contract VeyntMarket is ReentrancyGuard {
     // ============================================================
     // ERRORS
     // ============================================================
@@ -24,7 +25,11 @@ contract VeyntMarket {
     error GracePeriodNotPassed(uint256 refundableAfter);
     error NothingToWithdraw();
     error TransferFailed();
-    error Reentrancy();
+    error MarketNotEnded();
+    error MarketNotResolved();
+    error InvalidMerkleProof();
+    error UnauthorizedSigner();
+    error RefundAlreadyInitiated();
 
     // ============================================================
     // TYPE DECLARATIONS
@@ -39,6 +44,8 @@ contract VeyntMarket {
         bool resolved;
         bool outcome;
         bytes32 merkleRoot;
+        bool refundInitiated;
+        uint256 startTime;
     }
 
     // ============================================================
@@ -86,8 +93,6 @@ contract VeyntMarket {
     uint256 public marketCount;
 
     uint256 public accumulatedTreasuryFees;
-
-    uint256 private _locked = 1;
 
     mapping(uint256 => Market) public markets;
 
@@ -152,18 +157,6 @@ contract VeyntMarket {
         }
 
         _;
-    }
-
-    modifier nonReentrant() {
-        if (_locked != 1) {
-            revert Reentrancy();
-        }
-
-        _locked = 2;
-
-        _;
-
-        _locked = 1;
     }
 
     // ============================================================
@@ -237,6 +230,7 @@ contract VeyntMarket {
         market.question = _question;
         market.apiEndpoint = _apiEndpoint;
         market.deadline = _deadline;
+        market.startTime = block.timestamp;
 
         emit MarketCreated(
             marketId,
@@ -355,6 +349,7 @@ contract VeyntMarket {
         stakeOf[_marketId][msg.sender] = 0;
 
         market.totalPool -= amount;
+        market.refundInitiated = true;
 
         // --------------------------------------------------------
         // INTERACTION
@@ -379,7 +374,9 @@ contract VeyntMarket {
      * The TEE signs:
      *
      * keccak256(
-     *     abi.encodePacked(
+     *     abi.encode(
+     *         block.chainid,
+     *         address(this),
      *         _marketId,
      *         _merkleRoot,
      *         _outcome
@@ -403,6 +400,12 @@ contract VeyntMarket {
         if (market.resolved) {
             revert AlreadyResolved();
         }
+        if (block.timestamp < market.deadline) {
+            revert MarketNotEnded();
+        }
+        if (market.refundInitiated) {
+            revert RefundAlreadyInitiated();
+        }
 
         // --------------------------------------------------------
         // VALIDATE OUTCOME
@@ -425,7 +428,13 @@ contract VeyntMarket {
         // --------------------------------------------------------
 
         bytes32 messageHash = keccak256(
-            abi.encodePacked(_marketId, _merkleRoot, _outcome)
+            abi.encode(
+                block.chainid,
+                address(this),
+                _marketId,
+                _merkleRoot,
+                _outcome
+            )
         );
 
         // --------------------------------------------------------
@@ -446,7 +455,7 @@ contract VeyntMarket {
         );
 
         if (recoveredSigner != i_teeSigner) {
-            revert NotOwner();
+            revert UnauthorizedSigner();
         }
 
         // --------------------------------------------------------
@@ -527,7 +536,7 @@ contract VeyntMarket {
         Market storage market = markets[_marketId];
 
         if (!market.resolved) {
-            revert MarketNotFound();
+            revert MarketNotResolved();
         }
 
         if (hasClaimed[_marketId][msg.sender]) {
@@ -547,7 +556,7 @@ contract VeyntMarket {
         // --------------------------------------------------------
 
         if (!MerkleProof.verify(_merkleProof, market.merkleRoot, leaf)) {
-            revert TransferFailed();
+            revert InvalidMerkleProof();
         }
 
         // --------------------------------------------------------
@@ -575,21 +584,7 @@ contract VeyntMarket {
         bytes32 _ethSignedMessageHash,
         bytes memory _signature
     ) internal pure returns (address) {
-        if (_signature.length != 65) {
-            revert InvalidOutcome();
-        }
-
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
-
-        assembly {
-            r := mload(add(_signature, 32))
-            s := mload(add(_signature, 64))
-            v := byte(0, mload(add(_signature, 96)))
-        }
-
-        return ecrecover(_ethSignedMessageHash, v, r, s);
+        return ECDSA.recover(_ethSignedMessageHash, _signature);
     }
 
     // ============================================================

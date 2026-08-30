@@ -1,74 +1,66 @@
 const { createPublicClient, createWalletClient, http } = require("viem");
 const { privateKeyToAccount } = require("viem/accounts");
+const { TOKEN_SYMBOLS } = require("./token.js");
 
-// --- CONFIG ---
 const RPC_URL = "https://coston2-api.flare.network/ext/C/rpc";
+
 const VERIFIER_URL =
   "https://fdc-verifiers-testnet.flare.network/verifier/web2/Web2Json/prepareRequest";
+
 const API_KEY = "00000000-0000-0000-0000-000000000000";
+
 const REGISTRY = "0xaD67FE66660Fb8dFE9d6b1b4240d8650e30F6019";
+
+const DA_LAYER_URL =
+  "https://ctn2-data-availability.flare.network/api/v1/fdc/proof-by-request-round";
 
 const account = privateKeyToAccount(process.env.PRIVATE_KEY);
 
-const publicClient = createPublicClient({ transport: http(RPC_URL) });
-const walletClient = createWalletClient({ account, transport: http(RPC_URL) });
-async function prepareRequest() {
-  // const body = {
-  //   attestationType: toBytes32("Web2Json"),
-  //   sourceId: toBytes32("PublicWeb2"),
-  //   requestBody: {
-  //     url: "https://jsonplaceholder.typicode.com/todos/1",
-  //     httpMethod: "GET",
-  //     headers: "{}",
-  //     queryParams: "{}",
-  //     body: "{}",
-  //     postProcessJq: ".completed",
-  //     abiSignature: "bool",
-  //   },
-  // };
+const publicClient = createPublicClient({
+  transport: http(RPC_URL),
+});
 
-  // const requestBody = {
-  //   url: "https://api.coinbase.com/v2/prices/BTC-USD/spot",
-  //   httpMethod: "GET",
-  //   headers: "{}",
-  //   queryParams: "{}",
-  //   body: "{}",
-  //   postProcessJq:
-  //     '{ price: ((.data.amount | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
-  //   abiSignature: JSON.stringify({
-  //     type: "tuple",
-  //     components: [
-  //       {
-  //         name: "price",
-  //         type: "uint256",
-  //       },
-  //     ],
-  //   }),
-  // };
+const walletClient = createWalletClient({
+  account,
+  transport: http(RPC_URL),
+});
+
+function toBytes32(text) {
+  return "0x" + Buffer.from(text).toString("hex").padEnd(64, "0");
+}
+
+async function prepareRequest({ token, startTime, deadline, interval }) {
+  const symbol = TOKEN_SYMBOLS[token];
+
+  if (!symbol) {
+    throw new Error(`Unsupported token: ${token}`);
+  }
+
   const requestBody = {
     url: "https://data-api.binance.vision/api/v3/klines",
     httpMethod: "GET",
     headers: "{}",
     queryParams: JSON.stringify({
-      symbol: "BTCUSDT",
-      interval: "1m",
-      startTime: process.env.MARKET_DEADLINE_MS,
-      //startTime: "1710000000000",
-      limit: "1",
+      symbol: symbol,
+      interval: interval,
+      startTime: startTime,
+      endTime: deadline,
+      limit: "1000",
     }),
     body: "{}",
     postProcessJq:
-      '{ price: ((.[0][4] | tonumber) * 100000000 | tostring | split(".")[0] | tonumber) }',
+      '{ maxPrice: ((map(.[2] | tonumber) | sort | last) * 100000000 | tostring | split(".")[0] | tonumber), minPrice: ((map(.[3] | tonumber) | sort | first) * 100000000 | tostring | split(".")[0] | tonumber) }',
     abiSignature: JSON.stringify({
       type: "tuple",
       components: [
-        {
-          name: "price",
-          type: "uint256",
-        },
+        { name: "maxPrice", type: "uint256" },
+        { name: "minPrice", type: "uint256" },
       ],
     }),
   };
+  console.log("");
+  console.log("Request body:");
+  console.log(JSON.stringify(requestBody, null, 2));
 
   const body = {
     attestationType: toBytes32("Web2Json"),
@@ -78,31 +70,38 @@ async function prepareRequest() {
 
   const res = await fetch(VERIFIER_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY },
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-KEY": API_KEY,
+    },
     body: JSON.stringify(body),
   });
 
   const data = await res.json();
+
   if (data.status !== "VALID") {
     throw new Error("prepareRequest failed: " + JSON.stringify(data));
   }
 
-  console.log("Step 1 OK — abiEncodedRequest ready");
-  console.log("abiEncodedRequest:", data.abiEncodedRequest);
   return data.abiEncodedRequest;
 }
 
-function toBytes32(text) {
-  return "0x" + Buffer.from(text).toString("hex").padEnd(64, "0");
-}
 async function submitRequest(abiEncodedRequest) {
   const registryAbi = [
     {
       type: "function",
       name: "getContractAddressByName",
       stateMutability: "view",
-      inputs: [{ type: "string" }],
-      outputs: [{ type: "address" }],
+      inputs: [
+        {
+          type: "string",
+        },
+      ],
+      outputs: [
+        {
+          type: "address",
+        },
+      ],
     },
   ];
 
@@ -117,7 +116,6 @@ async function submitRequest(abiEncodedRequest) {
   const fdcHubAddr = await readAddr("FdcHub");
   const feeConfigAddr = await readAddr("FdcRequestFeeConfigurations");
   const fsmAddr = await readAddr("FlareSystemsManager");
-  console.log("FdcHub:", fdcHubAddr);
 
   const fee = await publicClient.readContract({
     address: feeConfigAddr,
@@ -126,14 +124,21 @@ async function submitRequest(abiEncodedRequest) {
         type: "function",
         name: "getRequestFee",
         stateMutability: "view",
-        inputs: [{ type: "bytes" }],
-        outputs: [{ type: "uint256" }],
+        inputs: [
+          {
+            type: "bytes",
+          },
+        ],
+        outputs: [
+          {
+            type: "uint256",
+          },
+        ],
       },
     ],
     functionName: "getRequestFee",
     args: [abiEncodedRequest],
   });
-  console.log("Fee (wei):", fee.toString());
 
   const txHash = await walletClient.writeContract({
     address: fdcHubAddr,
@@ -142,7 +147,11 @@ async function submitRequest(abiEncodedRequest) {
         type: "function",
         name: "requestAttestation",
         stateMutability: "payable",
-        inputs: [{ type: "bytes" }],
+        inputs: [
+          {
+            type: "bytes",
+          },
+        ],
         outputs: [],
       },
     ],
@@ -150,8 +159,10 @@ async function submitRequest(abiEncodedRequest) {
     args: [abiEncodedRequest],
     value: fee,
   });
-  console.log("Submitted, tx:", txHash);
-  await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+  await publicClient.waitForTransactionReceipt({
+    hash: txHash,
+  });
 
   const roundId = await publicClient.readContract({
     address: fsmAddr,
@@ -161,27 +172,30 @@ async function submitRequest(abiEncodedRequest) {
         name: "getCurrentVotingEpochId",
         stateMutability: "view",
         inputs: [],
-        outputs: [{ type: "uint32" }],
+        outputs: [
+          {
+            type: "uint32",
+          },
+        ],
       },
     ],
     functionName: "getCurrentVotingEpochId",
   });
-  console.log("Step 2 OK — round:", roundId.toString());
 
   return Number(roundId);
 }
-async function waitForFinalization(seconds = 180) {
-  console.log(`Step 3 — waiting ${seconds}s for the round to finalize...`);
-  await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
-  console.log("Step 3 OK — done waiting");
-}
-async function getProof(roundId, abiEncodedRequest) {
-  const DA_LAYER_URL =
-    "https://ctn2-data-availability.flare.network/api/v1/fdc/proof-by-request-round";
 
+async function waitForFinalization(seconds = 180) {
+  await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+}
+
+async function getProof(roundId, abiEncodedRequest) {
   const res = await fetch(DA_LAYER_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "X-API-KEY": API_KEY },
+    headers: {
+      "Content-Type": "application/json",
+      "X-API-KEY": API_KEY,
+    },
     body: JSON.stringify({
       votingRoundId: roundId,
       requestBytes: abiEncodedRequest,
@@ -189,39 +203,37 @@ async function getProof(roundId, abiEncodedRequest) {
   });
 
   const data = await res.json();
-  console.log("Step 4 — DA layer status:", res.status);
-  console.log("Step 4 — response:", JSON.stringify(data, null, 2));
 
   if (!data || !data.proof) {
-    throw new Error(
-      "No proof found — providers likely couldn't fetch this API, or round is off.",
-    );
+    throw new Error("No proof found");
   }
 
-  console.log("Step 4 OK — proof received");
   return data;
 }
-async function main() {
-  const abiEncodedRequest = await prepareRequest(); // Step 1
-  const roundId = await submitRequest(abiEncodedRequest); // Step 2
-  await waitForFinalization(180); // Step 3
-  const proof = await getProof(roundId, abiEncodedRequest); // Step 4
-  console.log("ALL DONE — full proof:", JSON.stringify(proof, null, 2));
-  //added xtra
+
+async function main({ token, startTime, deadline, interval }) {
+  token = token.toUpperCase();
+
+  if (interval !== "1m" && interval !== "1h") {
+    throw new Error(`Invalid interval: ${interval}. Expected 1m or 1h.`);
+  }
+
+  const abiEncodedRequest = await prepareRequest({
+    token,
+    startTime,
+    deadline,
+    interval,
+  });
+
+  const roundId = await submitRequest(abiEncodedRequest);
+
+  await waitForFinalization(180);
+
+  const proof = await getProof(roundId, abiEncodedRequest);
+
   return proof;
 }
-// added xtra:
-// module.exports = { main };
 
-// main().catch((e) => {
-//   console.error("FAILED:", e.message);
-//   process.exit(1);
-// });
-module.exports = { main };
-
-if (require.main === module) {
-  main().catch((e) => {
-    console.error("FAILED:", e.message);
-    process.exit(1);
-  });
-}
+module.exports = {
+  main,
+};
