@@ -1,19 +1,20 @@
 {
   "marketId": "2",
-  "contractAddress": "0xDaeB6e9b5c2E67B0C35F97FE9A0a67296AfE3771",
-  "question": "BTC|BELOW|6600000000000",
-  "winningOutcome": "YES",
-  "verifiedPrice": "6362092000000",
-  "targetPrice": "6600000000000",
-  "merkleRoot": "0x1e4f2927e04e1597089667d69f45f772994bfdb012a91a1d175812502b3b6481",
-  "blockNumber": "20179127",
-  "transactionHash": "0x7e6a985a42741a46d8e2cd96682211d0333893f5d15624dc2b5f2ee24eceab8b",
+  "contractAddress": "0x392B82F53b61f253a13B5aE403a000932d9485db",
+  "question": "AVAX|ABOVE|3000000000",
+  "winningOutcome": "NO",
+  "maxPrice": "752200000",
+  "minPrice": "750700000",
+  "targetPrice": "3000000000",
+  "merkleRoot": "0x035a34290631e382ff9f3ba2bebab43f48315218ec5b4fe924107298b1313f4f",
+  "blockNumber": "22140253",
+  "transactionHash": "0x258725424623c5d6b2cb7af1d2190d47d3b3284a97666faa9dc818e5f6ba4a50",
   "winners": [
     {
-      "bettor": "0x8EfdFCdF25fbDAF795bd636F57A0cee2A3848335",
+      "bettor": "0xEC132E529396Da0f38f6ebcb0af11e8Be927B8FB",
       "stake": "1000000000000000000",
-      "payout": "2580000000000000000",
-      "payoutBot": 2.58,
+      "payout": "1720000000000000000",
+      "payoutBot": 1.72,
       "proof": []
     }
   ]
