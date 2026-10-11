@@ -16,7 +16,7 @@ The stake and transaction stay public on-chain. The **prediction direction** is 
  
 | Network | Chain ID | VeyntMarket Address | Explorer |
 | ------- | -------- | ------------------- | -------- |
-| BOT Chain Testnet | 968 | `<TESTNET_ADDRESS_TBD>` | https://scan.bohr.life |
+| BOT Chain Testnet | 968 | `0x392B82F53b61f253a13B5aE403a000932d9485db` | https://scan.bohr.life |
 | BOT Chain Mainnet | `<TBD>` | `<MAINNET_ADDRESS_TBD>` (not deployed) | `<TBD>` |
  
 > Take the live address from the current deployment config, not from this table, until mainnet is finalized.
